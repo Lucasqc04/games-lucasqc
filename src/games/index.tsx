@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess as ChessEngine, type Square } from "chess.js";
 import type { Difficulty, GameResult, GameStats, PlayMode } from "../types";
 import { beep, formatTime } from "../lib/audio";
+import { BaralhoCigano } from "./baralho-cigano";
 import { EXPANDED_GAME_COMPONENTS } from "./expanded-games";
 
 export type GameComponentProps = {
@@ -4368,5 +4369,6 @@ export const GAME_COMPONENTS: Record<string, GameComponent> = {
   tetris: Tetris,
   sokoban: Sokoban,
   "dots-boxes": DotsAndBoxes,
+  "baralho-cigano": BaralhoCigano,
   ...EXPANDED_GAME_COMPONENTS,
 };

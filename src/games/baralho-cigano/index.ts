@@ -1,0 +1,1 @@
+export { BaralhoCigano } from "./Game";

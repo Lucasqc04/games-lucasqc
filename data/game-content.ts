@@ -28,6 +28,7 @@ const specificSummaries: Record<string, string> = {
   tetris: "Peças caem automaticamente, com rotação, queda rápida, linhas, níveis e score.",
   sokoban: "Empurre caixas até os alvos com desfazer, reinício e fases embutidas.",
   "dots-boxes": "Feche caixas desenhando linhas entre pontos e mantenha o turno ao pontuar.",
+  "baralho-cigano": "Tire cartas Lenormand com sorteio aleatório ou escolha manual, consulte Mesa Real e wiki completa das 36 cartas.",
 };
 
 export function getGameContent(gameId: string): GameContent {

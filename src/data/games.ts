@@ -559,4 +559,16 @@ export const games: GameMeta[] = [
     rules: ["Jogue rodadas com manilha definida pelo vira.", "Peça truco, seis, nove e doze para aumentar o valor da mão."],
     controls: ["Clique em uma carta, peça aumento ou aceite/recuse quando chamado."],
   },
+  {
+    id: "baralho-cigano",
+    title: "Baralho Cigano",
+    category: "Cartas",
+    icon: "🔮",
+    modes: ["Single player"],
+    rules: [
+      "Use as 36 cartas Lenormand para leituras simbólicas com carta direta, 3 cartas, cruz, quadro 3x3 ou Mesa Real.",
+      "Escolha sorteio aleatório ou abra manualmente as cartas fechadas, lendo cada posição e a wiki completa da carta.",
+    ],
+    controls: ["Selecione tiragem, área e modo no HUD.", "Clique nas cartas fechadas para revelar ou abrir detalhes da wiki."],
+  },
 ];

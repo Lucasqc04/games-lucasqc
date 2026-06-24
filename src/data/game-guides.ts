@@ -2000,6 +2000,50 @@ const gameGuides: Record<string, GameGuide> = {
       "Guardar uma manilha para a segunda ou terceira vaza pode surpreender.",
     ],
   },
+  "baralho-cigano": {
+    objective: "Fazer uma leitura simbolica com as 36 cartas do Baralho Cigano/Lenormand, escolhendo uma tiragem e interpretando cada carta pela posicao.",
+    setup: [
+      "Escreva uma pergunta objetiva ou deixe em branco para uma leitura geral.",
+      "Escolha a area principal: geral, amor, sentimentos, trabalho, financeiro, saude/energia, espiritual ou conselho.",
+      "Escolha a tiragem: 1 carta, 3 cartas, cruz de 5, quadro 3x3 ou Mesa Real com 36 cartas.",
+      "Escolha se quer sorteio aleatorio ou selecao manual das cartas fechadas.",
+    ],
+    steps: [
+      "No modo aleatorio, clique em Tirar cartas para preparar a mesa embaralhada.",
+      "Clique em cada carta fechada para revelar no seu ritmo.",
+      "No modo escolher cartas, prepare a mesa e toque nas cartas fechadas que quiser abrir.",
+      "Leia primeiro o nome da posicao, depois o significado da carta na area escolhida.",
+      "Clique em qualquer carta aberta para ver a wiki completa dela.",
+      "Use as combinacoes e cartas vizinhas para refinar a leitura.",
+    ],
+    rules: [
+      "Cada carta tem significados de luz, sombra, conselho, tempo, sim/nao e areas da vida.",
+      "A carta da posicao central costuma mostrar o tema principal quando a tiragem tem centro.",
+      "Na Mesa Real, as casas seguem a ordem das 36 cartas e ajudam a organizar assuntos.",
+      "Cartas proximas se influenciam: uma carta clara pode suavizar outra pesada, e uma carta de alerta pode pedir cautela.",
+      "A leitura e simbolica e nao substitui orientacao profissional para saude, dinheiro, contratos ou temas juridicos.",
+    ],
+    controls: [
+      "Seletores do topo mudam tiragem, modo e area.",
+      "Tirar cartas prepara uma leitura aleatoria.",
+      "Preparar mesa reinicia a selecao manual com as cartas fechadas.",
+      "Clique em uma carta fechada para revelar.",
+      "Revelar todas abre a tiragem inteira.",
+      "A aba Wiki permite buscar carta por nome, palavra-chave ou tema.",
+    ],
+    visual: [
+      "O verso indica carta ainda fechada.",
+      "A etiqueta acima da carta mostra a posicao da tiragem.",
+      "Carta com borda laranja e a carta selecionada no painel de leitura.",
+      "Na selecao manual, cartas ja abertas aparecem viradas para cima no baralho fechado.",
+    ],
+    tips: [
+      "Perguntas simples funcionam melhor que perguntas muito amplas.",
+      "Para amor, compare O Coracao, O Anel, O Homem, A Mulher e cartas vizinhas.",
+      "Para financeiro, observe Os Peixes, O Urso, Os Ratos, A Ancora e A Carta.",
+      "Se aparecerem cartas pesadas, procure o conselho da propria carta antes de concluir algo definitivo.",
+    ],
+  },
 };
 
 export function getGameGuide(game: GameMeta): GameGuide {
