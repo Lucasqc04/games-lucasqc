@@ -4252,7 +4252,7 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
   const [turn, setTurn] = useState<1 | 2>(1);
   const [ended, setEnded] = useState(false);
   const boardSize = Number(dotsSize);
-  const gridDimension = boardSize >= 7 ? "h-7 w-7 sm:h-7 sm:w-7" : boardSize >= 6 ? "h-8 w-8 sm:h-9 sm:w-9" : "h-10 w-10 sm:h-10 sm:w-10";
+  const dotBoardColumns = boardSize * 2 - 1;
 
   function reset(nextMode = mode, nextSize = dotsSize) {
     setDotsSize(nextSize);
@@ -4307,9 +4307,15 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
           { label: "Turno", value: turn === 1 ? "Jogador 1" : mode === "ai" ? "Máquina" : "Jogador 2" },
         ]}
       />
-      <div className="game-board-panel mx-auto grid w-max rounded-lg p-4" style={{ gridTemplateColumns: `repeat(${boardSize * 2 - 1}, 2.4rem)` }}>
-        {range(boardSize * 2 - 1).flatMap((r) =>
-          range(boardSize * 2 - 1).map((c) => {
+      <div
+        className="game-board-panel mx-auto grid w-[min(92vw,34rem)] gap-[2px] rounded-lg p-2"
+        style={{
+          gridTemplateColumns: `repeat(${dotBoardColumns}, minmax(0, 1fr))`,
+          width: `min(92vw, ${Math.min(34, boardSize * 4.8)}rem)`,
+        }}
+      >
+        {range(dotBoardColumns).flatMap((r) =>
+          range(dotBoardColumns).map((c) => {
             const isDot = r % 2 === 0 && c % 2 === 0;
             const h = r % 2 === 0 && c % 2 === 1;
             const v = r % 2 === 1 && c % 2 === 0;
@@ -4323,7 +4329,7 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
                 disabled={!edge || (mode === "ai" && turn === 2)}
                 onClick={() => edge && play(edge)}
                 className={cn(
-                  `game-cell overflow-hidden text-slate-950 dark:text-white ${gridDimension}`,
+                  "game-cell aspect-square overflow-hidden text-slate-950 dark:text-white",
                   edge ? (!edges.has(edgeKey(edge)) ? "rounded hover:bg-brand-100 dark:hover:bg-cyan-300/25" : undefined) : undefined,
                   edge && edges.has(edgeKey(edge)) ? (h ? "border-y-4 border-brand-500 dark:border-cyan-300" : "border-x-4 border-brand-500 dark:border-cyan-300") : undefined,
                   box && owner === 1 && "bg-cyan-300/30",

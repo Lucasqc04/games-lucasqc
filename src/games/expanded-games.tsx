@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import type { Difficulty, GameResult, GameStats, PlayMode } from "../types";
 import { Termo } from "./termo";
 
@@ -91,7 +91,11 @@ function GameFrame({
   return (
     <div className="w-full space-y-2">
       {actions && <div className="flex flex-wrap items-end gap-1.5 text-slate-950 dark:text-slate-100">{actions}</div>}
-      {status && <div className="rounded-xl border border-brand-500/25 bg-brand-50 px-3 py-2 text-sm font-black text-brand-900 dark:border-brand-500/25 dark:bg-brand-500/10 dark:text-brand-100">{status}</div>}
+      {status && (
+        <div className="break-words rounded-xl border border-brand-500/25 bg-brand-50 px-3 py-2 text-sm font-black text-brand-900 dark:border-brand-500/25 dark:bg-brand-500/10 dark:text-brand-100">
+          {status}
+        </div>
+      )}
       {children}
     </div>
   );
@@ -156,9 +160,9 @@ function Select<T extends string>({
 
 function ScoreStrip({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex min-w-0 flex-wrap gap-2">
       {items.map((item) => (
-        <div key={item.label} className="min-w-[7.5rem] rounded-xl border border-slate-200 bg-slate-950/[0.04] px-3 py-2 dark:border-white/10 dark:bg-white/[0.06]">
+        <div key={item.label} className="min-w-[6.4rem] flex-1 rounded-xl border border-slate-200 bg-slate-950/[0.04] px-3 py-2 dark:border-white/10 dark:bg-white/[0.06]">
           <span className="block text-xs font-black uppercase text-slate-600 dark:text-slate-500">{item.label}</span>
           <span className="text-base font-black text-slate-950 dark:text-white">{item.value}</span>
         </div>
@@ -218,36 +222,389 @@ function normalizePtWord(word: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/Ç/g, "C")
     .replace(/ç/g, "c")
-    .toUpperCase();
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
 }
 
-const connectionGroups = [
-  { name: "Naipes", words: ["Copas", "Ouros", "Paus", "Espadas"] },
-  { name: "Cores", words: ["Vermelho", "Azul", "Amarelo", "Verde"] },
-  { name: "Jogos", words: ["Tetris", "Snake", "Pong", "Sokoban"] },
-  { name: "Direções", words: ["Norte", "Sul", "Leste", "Oeste"] },
-  { name: "Planetas", words: ["Mercurio", "Terra", "Marte", "Saturno"] },
-  { name: "Frutas", words: ["Maçã", "Banana", "Uva", "Limão"] },
-  { name: "Estações", words: ["Primavera", "Verão", "Outono", "Inverno"] },
-  { name: "Continentes", words: ["Ásia", "África", "Europa", "América"] },
-  { name: "Esportes", words: ["Futebol", "Vôlei", "Tênis", "Natação"] },
-  { name: "Linguagens", words: ["Python", "Java", "Ruby", "Rust"] },
-  { name: "Transporte", words: ["Ônibus", "Trem", "Avião", "Navio"] },
-  { name: "Metais", words: ["Ouro", "Prata", "Cobre", "Ferro"] },
+type ConnectionCategory = {
+  name: string;
+  words: string[];
+};
+
+const WORD_LIBRARY_ENDPOINTS = ["/assets/games/words/pt-5.json", "/assets/games/words/pt-word-search.json"];
+
+const FALLBACK_WORD_LIBRARY = [
+  "LUCAS",
+  "JOGOS",
+  "PIX",
+  "TRUCO",
+  "SNAKE",
+  "TETRIS",
+  "CARTA",
+  "DADOS",
+  "PRAIA",
+  "NUVEM",
+  "BANCO",
+  "FORTE",
+  "MUNDO",
+  "LINHA",
+  "PONTE",
+  "CARTAO",
+  "LUCAR",
+  "TACAO",
+  "JOGAR",
+  "TODO",
+  "DIA",
+  "TACO",
+  "CARTAZ",
+  "COPAS",
+  "OUROS",
+  "PAUS",
+  "ESPADAS",
+  "VERMELHO",
+  "AZUL",
+  "AMARELO",
+  "VERDE",
+  "NORTE",
+  "SUL",
+  "LESTE",
+  "OESTE",
+  "MERCURIO",
+  "TERRA",
+  "MARTE",
+  "SATURNO",
+  "MACA",
+  "BANANA",
+  "UVA",
+  "LIMAO",
+  "PRIMAVERA",
+  "VERAO",
+  "OUTONO",
+  "INVERNO",
+  "ASIA",
+  "AFRICA",
+  "EUROPA",
+  "AMERICA",
+  "FUTEBOL",
+  "VOLEI",
+  "TENNIS",
+  "NATACAO",
+  "PYTHON",
+  "JAVA",
+  "RUBY",
+  "RUST",
+  "ONIBUS",
+  "TREM",
+  "AVIAO",
+  "NAVIO",
+  "OURO",
+  "PRATA",
+  "COBRE",
+  "FERRO",
+  "ANAGRAMA",
+  "BEE",
+  "CRIPTO",
+  "CONEXAO",
 ];
 
-function createConnectionRound(seed: number) {
-  const usedWords = new Set<string>();
-  return shuffleSeeded(connectionGroups, seed).reduce<{
-    name: string;
-    words: string[];
-  }[]>((acc, group) => {
-    if (acc.length >= 4) return acc;
-    const hasDuplicate = group.words.some((word) => usedWords.has(word));
-    if (hasDuplicate) return acc;
-    group.words.forEach((word) => usedWords.add(word));
-    return [...acc, group];
+const FALLBACK_CONNECTION_GROUPS: ConnectionCategory[] = [
+  { name: "Naipes", words: ["COPAS", "OUROS", "PAUS", "ESPADAS"] },
+  { name: "Cores", words: ["VERMELHO", "AZUL", "AMARELO", "VERDE"] },
+  { name: "Jogos", words: ["TETRIS", "SNAKE", "PONG", "SOKOBAN"] },
+  { name: "Direções", words: ["NORTE", "SUL", "LESTE", "OESTE"] },
+  { name: "Planetas", words: ["MERCURIO", "TERRA", "MARTE", "SATURNO"] },
+  { name: "Frutas", words: ["MACA", "BANANA", "UVA", "LIMAO"] },
+  { name: "Estações", words: ["PRIMAVERA", "VERAO", "OUTONO", "INVERNO"] },
+  { name: "Continentes", words: ["ASIA", "AFRICA", "EUROPA", "AMERICA"] },
+  { name: "Esportes", words: ["FUTEBOL", "VOLEI", "TENNIS", "NATACAO"] },
+  { name: "Linguagens", words: ["PYTHON", "JAVA", "RUBY", "RUST"] },
+  { name: "Transporte", words: ["ONIBUS", "TREM", "AVIAO", "NAVIO"] },
+  { name: "Metais", words: ["OURO", "PRATA", "COBRE", "FERRO"] },
+];
+
+const FALLBACK_ANAGRAM_ROUNDS = [["TACRAO", "CARTAO"], ["OJOGS", "JOGOS"], ["CASUL", "LUCAS"], ["TENOP", "PONTE"]];
+const FALLBACK_BEE_PUZZLE = {
+  center: "A",
+  letters: ["A", "R", "T", "C", "O", "S", "L"],
+  words: ["CARTA", "CARO", "CASA", "SALA", "ALTO", "ROTA", "TALA", "COSTA", "LASTRO"],
+};
+const FALLBACK_CRYPTOPUZZLE = { phrase: "JOGAR TODO DIA", shift: 5 };
+const FALLBACK_LADDER_START = "GATO";
+const FALLBACK_LADDER_TARGET = "RATO";
+const FALLBACK_LADDER_WORDS = ["GATO", "RATO", "RITO", "RIO", "GALO", "GELA", "GEMA", "REMA", "REMO", "RAMO", "LAGO", "MATO", "PLANO", "RIMA", "SINA"];
+const FALLBACK_STOP_LETTER_ROUND: Record<string, string> = {
+  Nome: "LUCAS",
+  País: "LUA",
+  Animal: "LAGARTA",
+  Comida: "LIMAO",
+  Objeto: "LIVRO",
+};
+
+const CRYPTO_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function uniqueWords(items: string[]) {
+  return Array.from(new Set(items.map(normalizePtWord)));
+}
+
+function sanitizeWordLibrary(items: string[]) {
+  return uniqueWords(items).filter((word) => /^[A-Z]{4,12}$/.test(word));
+}
+
+let wordLibraryCache: string[] | null = null;
+let wordLibraryPromise: Promise<string[]> | null = null;
+
+function loadWordLibrary() {
+  if (wordLibraryCache) return Promise.resolve(wordLibraryCache);
+  if (!wordLibraryPromise) {
+    wordLibraryPromise = Promise.all(
+      WORD_LIBRARY_ENDPOINTS.map((url) =>
+        fetch(url)
+          .then((response) => (response.ok ? response.json() : Promise.reject(new Error("wordlist"))))
+          .catch(() => [] as string[]),
+      ),
+    )
+      .then((batches) => {
+        const merged = batches.flatMap((batch) => (Array.isArray(batch) ? batch : []));
+        const normalized = sanitizeWordLibrary(merged as string[]);
+        const mergedWithFallback = sanitizeWordLibrary([...normalized, ...FALLBACK_WORD_LIBRARY]);
+        wordLibraryCache = mergedWithFallback;
+        return mergedWithFallback;
+      })
+      .catch(() => {
+        const fallback = sanitizeWordLibrary(FALLBACK_WORD_LIBRARY);
+        wordLibraryCache = fallback;
+        return fallback;
+      });
+  }
+  return wordLibraryPromise;
+}
+
+function useWordLibrary() {
+  const [words, setWords] = useState<string[]>(sanitizeWordLibrary(FALLBACK_WORD_LIBRARY));
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadWordLibrary().then((loaded) => {
+      if (!cancelled) {
+        setWords(loaded);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  return words;
+}
+
+function randomFrom<T>(items: T[], random: () => number) {
+  return items[Math.floor(random() * items.length)];
+}
+
+function shuffleString(value: string, seed: number) {
+  const shuffled = shuffleSeeded(value.split(""), seed).join("");
+  if (shuffled !== value) return shuffled;
+  return `${value[1]}${value[0]}${value.slice(2)}`;
+}
+
+function buildConnectionTemplates(wordLibrary: string[]) {
+  const words = sanitizeWordLibrary(wordLibrary);
+  const byFirst = new Map<string, string[]>();
+  const byLast = new Map<string, string[]>();
+  const byLength = new Map<number, string[]>();
+  const bySuffix = new Map<string, string[]>();
+
+  words.forEach((word) => {
+    const first = word[0];
+    const last = word[word.length - 1];
+    const suffix = word.slice(-2);
+    byFirst.set(first, [...(byFirst.get(first) || []), word]);
+    byLast.set(last, [...(byLast.get(last) || []), word]);
+    byLength.set(word.length, [...(byLength.get(word.length) || []), word]);
+    if (word.length >= 6) {
+      bySuffix.set(suffix, [...(bySuffix.get(suffix) || []), word]);
+    }
+  });
+
+  const templates: ConnectionCategory[] = [];
+  for (const [letter, list] of byFirst) {
+    if (list.length >= 4) templates.push({ name: `Iniciam com ${letter}`, words: list });
+  }
+  for (const [letter, list] of byLast) {
+    if (list.length >= 4) templates.push({ name: `Acabam em ${letter}`, words: list });
+  }
+  for (const [length, list] of byLength) {
+    if (length >= 4 && length <= 10 && list.length >= 4) {
+      templates.push({ name: `Tem ${length} letras`, words: list });
+    }
+  }
+  for (const [suffix, list] of bySuffix) {
+    if (list.length >= 4) templates.push({ name: `Terminam em ${suffix}`, words: list });
+  }
+  return templates;
+}
+
+function buildConnectionRound(seed: number, wordLibrary: string[]) {
+  const usedWords = new Set<string>();
+  const source = shuffleSeeded(buildConnectionTemplates(wordLibrary), seed);
+  const candidateSource = source.length >= 4 ? source : FALLBACK_CONNECTION_GROUPS;
+  return candidateSource.reduce<ConnectionCategory[]>((acc, group) => {
+    if (acc.length >= 4) return acc;
+    const available = shuffleSeeded(Array.from(new Set(group.words)), seed).filter((word) => !usedWords.has(word));
+    if (available.length < 4) return acc;
+    const selected = available.slice(0, 4);
+    selected.forEach((word) => usedWords.add(word));
+    return [...acc, { ...group, words: selected }];
+  }, []);
+}
+
+function buildAnagramRounds(wordLibrary: string[], seed: number) {
+  const groups = new Map<string, string[]>();
+  for (const word of sanitizeWordLibrary(wordLibrary).filter((word) => word.length >= 4 && word.length <= 8)) {
+    const signature = [...word].sort().join("");
+    groups.set(signature, [...(groups.get(signature) || []), word]);
+  }
+  const available = [...groups.values()].filter((group) => group.length >= 2);
+  if (!available.length) return FALLBACK_ANAGRAM_ROUNDS;
+
+  return shuffleSeeded(available, seed)
+    .slice(0, Math.min(10, available.length))
+    .map((group, index) => [shuffleString(group[0], seed + index), group[0]]);
+}
+
+const spellingBeeSlots = [
+  { left: "50%", top: "50%", center: true, index: 0 },
+  { left: "82%", top: "23%", index: 1 },
+  { left: "93%", top: "50%", index: 2 },
+  { left: "82%", top: "78%", index: 3 },
+  { left: "50%", top: "92%", index: 4 },
+  { left: "18%", top: "78%", index: 5 },
+  { left: "7%", top: "50%", index: 6 },
+];
+
+function buildSpellingBeePuzzle(wordLibrary: string[], seed: number) {
+  const words = sanitizeWordLibrary(wordLibrary).filter((word) => word.length >= 4 && word.length <= 12);
+  if (!words.length) return FALLBACK_BEE_PUZZLE;
+
+  const random = seededRandom(seed * 127 + 13);
+  const roots = words.filter((word) => new Set(word).size >= 7);
+  const source = roots.length ? roots : words;
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const sourceWord = randomFrom(source, random);
+    let letters = Array.from(new Set(sourceWord));
+    while (letters.length < 7) {
+      const next = String.fromCharCode(65 + Math.floor(random() * 26));
+      if (!letters.includes(next)) letters.push(next);
+    }
+    if (letters.length > 7) letters = shuffleSeeded(letters, seed + attempt).slice(0, 7);
+    const allowed = new Set(letters);
+    const center = letters[0];
+    const possible = words.filter((word) => word.includes(center) && [...word].every((letter) => allowed.has(letter)));
+    if (possible.length >= 6) {
+      return { center, letters, words: possible };
+    }
+  }
+
+  return FALLBACK_BEE_PUZZLE;
+}
+
+function buildShiftMap(shift: number) {
+  return Object.fromEntries(CRYPTO_ALPHABET.split("").map((letter, index) => [letter, CRYPTO_ALPHABET[(index + shift) % CRYPTO_ALPHABET.length]]));
+}
+
+function buildCryptogramPuzzle(wordLibrary: string[], seed: number) {
+  const words = sanitizeWordLibrary(wordLibrary).filter((word) => word.length >= 3 && word.length <= 12);
+  if (!words.length) return FALLBACK_CRYPTOPUZZLE;
+  const random = seededRandom(seed * 911 + 17);
+  const count = 3 + Math.floor(random() * 4);
+  const selected = Array.from({ length: count }, () => randomFrom(words, random));
+  const shift = 3 + Math.floor(random() * 20);
+  const map = buildShiftMap(shift);
+  const phrase = selected.join(" ");
+  const cipher = phrase.replace(/[A-Z]/g, (letter) => map[letter]);
+  return { phrase, shift, cipher };
+}
+
+function buildWordLadderChallenge(wordLibrary: string[], seed: number) {
+  const words = sanitizeWordLibrary(wordLibrary);
+  const random = seededRandom(seed * 401 + 11);
+  const valid = words.filter((word) => word.length >= 4 && word.length <= 7);
+
+  const lengths = [4, 5, 6];
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const length = randomFrom(lengths, random);
+    const sameLength = valid.filter((word) => word.length === length);
+    if (sameLength.length < 8) continue;
+
+    const patterns = new Map<string, string[]>();
+    for (const word of sameLength) {
+      for (let index = 0; index < word.length; index += 1) {
+        const key = `${word.slice(0, index)}_${word.slice(index + 1)}`;
+        patterns.set(key, [...(patterns.get(key) || []), word]);
+      }
+    }
+
+    const start = randomFrom(sameLength, random);
+    const neighbors = new Set<string>();
+    for (let index = 0; index < start.length; index += 1) {
+      const key = `${start.slice(0, index)}_${start.slice(index + 1)}`;
+      for (const word of patterns.get(key) || []) {
+        if (word !== start) neighbors.add(word);
+      }
+    }
+    if (!neighbors.size) continue;
+
+    const target = randomFrom(Array.from(neighbors), random);
+    const distractors = shuffleSeeded(sameLength.filter((item) => item !== start && item !== target), seed + attempt).slice(0, 24);
+    return {
+      start,
+      target,
+      words: Array.from(new Set([start, target, ...distractors, ...sameLength.filter((item) => item.length === length)])),
+    };
+  }
+
+  return {
+    start: FALLBACK_LADDER_START,
+    target: FALLBACK_LADDER_TARGET,
+    words: FALLBACK_LADDER_WORDS,
+  };
+}
+
+function buildStopRound(wordLibrary: string[], seed: number) {
+  const words = sanitizeWordLibrary(wordLibrary).filter((word) => word.length >= 4);
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const random = seededRandom(seed * 701 + 17);
+  const valid = Array.from(new Set(words));
+
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const letter = randomFrom([...letters], random);
+    const pool = valid.filter((word) => word[0] === letter);
+    if (pool.length >= stopCategories.length) {
+      const selected = shuffleSeeded(pool, seed + attempt).slice(0, stopCategories.length);
+      return {
+        letter,
+        answers: {
+          Nome: selected[0],
+          País: selected[1],
+          Animal: selected[2],
+          Comida: selected[3],
+          Objeto: selected[4],
+        },
+      };
+    }
+  }
+
+  return {
+    letter: "L",
+    answers: {
+      Nome: FALLBACK_STOP_LETTER_ROUND.Nome,
+      País: FALLBACK_STOP_LETTER_ROUND.País,
+      Animal: FALLBACK_STOP_LETTER_ROUND.Animal,
+      Comida: FALLBACK_STOP_LETTER_ROUND.Comida,
+      Objeto: FALLBACK_STOP_LETTER_ROUND.Objeto,
+    },
+  };
 }
 
 function Connections({ record }: ExpandedGameProps) {
@@ -256,7 +613,8 @@ function Connections({ record }: ExpandedGameProps) {
   const [found, setFound] = useState<string[]>([]);
   const [errors, setErrors] = useState(0);
   const [status, setStatus] = useState("Selecione 4 palavras por rodada.");
-  const groups = useMemo(() => createConnectionRound(seed), [seed]);
+  const dictionary = useWordLibrary();
+  const groups = useMemo(() => buildConnectionRound(seed, dictionary), [seed, dictionary]);
   const words = useMemo(() => shuffleSeeded(groups.flatMap((group) => group.words), seed), [groups, seed]);
   const groupsByName = useMemo(() => Object.fromEntries(groups.map((group) => [group.name, group])), [groups]);
 
@@ -388,10 +746,6 @@ function seededRandom(seed: number) {
   };
 }
 
-function randomFrom<T>(items: T[], random: () => number) {
-  return items[Math.floor(random() * items.length)];
-}
-
 function createWordSearch(sizeKey: WordSearchSize, seed: number, pool: string[]) {
   const config = wordSearchSizeMap[sizeKey];
   const random = seededRandom(seed * 1009 + config.size);
@@ -444,26 +798,16 @@ function createWordSearch(sizeKey: WordSearchSize, seed: number, pool: string[])
 function WordSearch({ record }: ExpandedGameProps) {
   const [sizeKey, setSizeKey] = useState<WordSearchSize>("medium");
   const [seed, setSeed] = useState(1);
-  const [pool, setPool] = useState(wordSearchExtraWords);
+  const dictionary = useWordLibrary();
+  const pool = useMemo(() => {
+    const normalized = dictionary.filter(isValidWordForSearch);
+    return Array.from(new Set([...wordSearchExtraWords, ...normalized]));
+  }, [dictionary]);
   const [start, setStart] = useState<number | null>(null);
   const [found, setFound] = useState<string[]>([]);
   const [message, setMessage] = useState("Clique na primeira e na última letra.");
   const puzzle = useMemo(() => createWordSearch(sizeKey, seed, pool), [pool, seed, sizeKey]);
   const foundCells = useMemo(() => new Set(found.flatMap((word) => puzzle.positions[word] || [])), [found, puzzle]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/assets/games/words/pt-word-search.json")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("wordlist"))))
-      .then((words: string[]) => {
-        if (cancelled) return;
-        setPool(Array.from(new Set([...wordSearchExtraWords, ...words.map(normalizePtWord).filter(isValidWordForSearch)])));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function reset(nextSize = sizeKey) {
     setSizeKey(nextSize);
@@ -612,19 +956,15 @@ function Crossword({ record }: ExpandedGameProps) {
   );
 }
 
-const anagramRounds = [
-  ["TACRAO", "CARTAO"],
-  ["OJOGS", "JOGOS"],
-  ["CASUL", "LUCAS"],
-  ["TENOP", "PONTE"],
-];
-
 function Anagrams({ record }: ExpandedGameProps) {
+  const [seed, setSeed] = useState(1);
   const [round, setRound] = useState(0);
   const [input, setInput] = useState("");
   const [score, setScore] = useState(0);
   const [message, setMessage] = useState("Desembaralhe a palavra.");
-  const current = anagramRounds[round % anagramRounds.length];
+  const dictionary = useWordLibrary();
+  const rounds = useMemo(() => buildAnagramRounds(dictionary, seed), [dictionary, seed]);
+  const current = rounds[round % rounds.length];
   function submit() {
     if (input.trim().toUpperCase() !== current[1]) {
       setMessage("Resposta incorreta.");
@@ -635,7 +975,7 @@ function Anagrams({ record }: ExpandedGameProps) {
     setInput("");
     setRound((value) => value + 1);
     setMessage("Correto.");
-    if (round + 1 >= anagramRounds.length) emit(record, "solo", "Anagramas concluído", nextScore);
+    if (round + 1 >= rounds.length) emit(record, "solo", "Anagramas concluído", nextScore);
   }
   return (
     <GameFrame
@@ -646,35 +986,43 @@ function Anagrams({ record }: ExpandedGameProps) {
           <Button tone="primary" onClick={submit}>
             Enviar
           </Button>
-          <Button onClick={() => { setRound(0); setInput(""); setScore(0); }}>Reiniciar</Button>
+          <Button
+            onClick={() => {
+              setRound(0);
+              setInput("");
+              setScore(0);
+              setMessage("Desembaralhe a palavra.");
+              setSeed((value) => value + 1);
+            }}
+          >
+            Nova rodada
+          </Button>
         </>
       }
     >
-      <ScoreStrip items={[{ label: "Letras", value: current[0] }, { label: "Rodada", value: `${Math.min(round + 1, anagramRounds.length)}/${anagramRounds.length}` }, { label: "Score", value: score }]} />
+      <ScoreStrip items={[{ label: "Letras", value: current[0] }, { label: "Rodada", value: `${Math.min(round + 1, rounds.length)}/${rounds.length}` }, { label: "Score", value: score }]} />
     </GameFrame>
   );
 }
 
-const beeLetters = ["A", "R", "T", "C", "O", "S", "L"];
-const beeCenter = "A";
-const beeWords = ["CARTA", "CARO", "CASA", "SALA", "ALTO", "ROTA", "TALA", "COSTA", "LASTRO"];
-const beeBoardSlots = [
-  { letter: beeCenter, left: "50%", top: "50%", center: true },
-  { letter: "T", left: "82%", top: "23%" },
-  { letter: "C", left: "93%", top: "50%" },
-  { letter: "O", left: "82%", top: "78%" },
-  { letter: "S", left: "50%", top: "92%" },
-  { letter: "L", left: "18%", top: "78%" },
-  { letter: "R", left: "7%", top: "50%" },
-];
-
 function SpellingBee({ record }: ExpandedGameProps) {
+  const [seed, setSeed] = useState(1);
   const [input, setInput] = useState("");
   const [found, setFound] = useState<string[]>([]);
   const [message, setMessage] = useState("A letra central é obrigatória.");
+  const dictionary = useWordLibrary();
+  const puzzle = useMemo(() => buildSpellingBeePuzzle(dictionary, seed), [dictionary, seed]);
+  const boardSlots = useMemo(
+    () =>
+      spellingBeeSlots.map((slot) => ({
+        ...slot,
+        letter: puzzle.letters[slot.index] || "A",
+      })),
+    [puzzle.letters],
+  );
   function submit(word = input) {
     const normalized = word.trim().toUpperCase();
-    if (!normalized.includes(beeCenter) || !beeWords.includes(normalized) || found.includes(normalized)) {
+    if (!normalized.includes(puzzle.center) || !puzzle.words.includes(normalized) || found.includes(normalized)) {
       setMessage("Palavra inválida, repetida ou sem a letra central.");
       return;
     }
@@ -682,23 +1030,39 @@ function SpellingBee({ record }: ExpandedGameProps) {
     setFound(next);
     setInput("");
     setMessage("Palavra aceita.");
-    if (next.length === beeWords.length) emit(record, "solo", "Soletrando completo", 1200);
+    if (next.length === puzzle.words.length) emit(record, "solo", "Soletrando completo", 1200);
   }
   return (
     <GameFrame
-      status={`Encontradas ${found.length}/${beeWords.length}. ${message}`}
+      status={`Encontradas ${found.length}/${puzzle.words.length}. ${message}`}
       actions={
         <>
-          <TextInput value={input} onChange={setInput} placeholder="Digite sua palavra..." />
-          <Button tone="primary" onClick={() => submit()}>Entrar</Button>
-          <Button onClick={() => { setFound([]); setInput(""); setMessage("Palavras resetadas."); }}>Recomeçar</Button>
+          <Button
+            onClick={() => {
+              setInput("");
+              setFound([]);
+              setMessage("A letra central é obrigatória.");
+              setSeed((value) => value + 1);
+            }}
+          >
+            Nova rodada
+          </Button>
+          <Button
+            onClick={() => {
+              setFound([]);
+              setInput("");
+              setMessage("Palavras resetadas.");
+            }}
+          >
+            Recomeçar
+          </Button>
         </>
       }
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="mx-auto flex w-full max-w-[24rem] flex-col justify-center gap-4">
-          <div className="relative mx-auto aspect-square w-full">
-            {beeBoardSlots.map((slot, index) => (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <div className="mx-auto flex w-full max-w-[24rem] flex-col gap-4">
+          <div className="relative mx-auto aspect-square w-full max-w-[18rem]">
+            {boardSlots.map((slot, index) => (
               <button
                 key={`${index}-${slot.letter}`}
                 type="button"
@@ -715,23 +1079,26 @@ function SpellingBee({ record }: ExpandedGameProps) {
             ))}
           </div>
           <div className="grid grid-cols-4 gap-2">
-            {beeBoardSlots.map((slot) => (
+            {boardSlots.map((slot) => (
               <Button key={slot.letter} tone={slot.center ? "primary" : "default"} onClick={() => setInput((value) => value + slot.letter)}>
                 {slot.letter}
               </Button>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button onClick={() => setInput("")}>Limpar</Button>
+          <div className="grid gap-2">
             <input
               value={input}
               onChange={(event) => setInput(event.target.value.toUpperCase())}
               className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-black uppercase text-slate-950 placeholder:text-slate-500 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
               placeholder="Digite a palavra"
             />
-            <div className="col-span-2 text-right text-xs text-slate-500 dark:text-slate-400">
-              Letras aceitas: 9 (ex.: {beeWords[0]})
+            <div className="grid grid-cols-2 gap-2">
+              <Button tone="primary" onClick={() => submit()}>Entrar</Button>
+              <Button onClick={() => setInput("")}>Limpar</Button>
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Letras aceitas: 7 (ex.: {puzzle.words[0]})
+            </p>
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.06]">
@@ -753,12 +1120,20 @@ function SpellingBee({ record }: ExpandedGameProps) {
   );
 }
 
-const ladderDictionary = new Set(["GATO", "RATO", "RITO", "RIO", "GALO", "GELA", "GEMA", "REMA", "REMO", "RAMO"]);
-
 function WordLadder({ record }: ExpandedGameProps) {
-  const [path, setPath] = useState(["GATO"]);
+  const [seed, setSeed] = useState(1);
+  const [path, setPath] = useState([FALLBACK_LADDER_START]);
   const [input, setInput] = useState("");
-  const target = "RIO";
+  const dictionary = useWordLibrary();
+  const challenge = useMemo(() => buildWordLadderChallenge(dictionary, seed), [dictionary, seed]);
+  const target = challenge.target;
+  const ladderDictionary = useMemo(() => new Set(challenge.words), [challenge.words]);
+
+  useEffect(() => {
+    setPath([challenge.start]);
+    setInput("");
+  }, [challenge.start, challenge.target]);
+
   function diffOne(a: string, b: string) {
     return a.length === b.length && [...a].filter((letter, i) => letter !== b[i]).length === 1;
   }
@@ -773,36 +1148,64 @@ function WordLadder({ record }: ExpandedGameProps) {
   }
   return (
     <GameFrame
-      status={`Transforme GATO em RIO. Caminho: ${path.join(" → ")}`}
+      status={`Transforme ${challenge.start} em ${target}. Caminho: ${path.join(" → ")}`}
       actions={
         <>
           <TextInput value={input} onChange={setInput} placeholder="próxima" />
           <Button tone="primary" onClick={submit}>Aplicar</Button>
-          <Button onClick={() => setPath(["GATO"])}>Reiniciar</Button>
+          <Button
+            onClick={() => {
+              setSeed((value) => value + 1);
+            }}
+          >
+            Reiniciar
+          </Button>
         </>
       }
     >
-      <div className="flex flex-wrap gap-2">{[...ladderDictionary].map((word) => <span key={word} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300">{word}</span>)}</div>
+      <div className="flex flex-wrap gap-2">{[...challenge.words].map((word) => <span key={word} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300">{word}</span>)}</div>
     </GameFrame>
   );
 }
 
-const cryptPhrase = "JOGAR TODO DIA";
-const cryptAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const cryptMap: Record<string, string> = Object.fromEntries([...cryptAlphabet].map((letter, i) => [letter, cryptAlphabet[(i + 5) % cryptAlphabet.length]]));
-
 function Cryptogram({ record }: ExpandedGameProps) {
-  const cipher = cryptPhrase.replace(/[A-Z]/g, (letter) => cryptMap[letter]);
-  const cipherLetters = [...new Set(cipher.replace(/[^A-Z]/g, "").split(""))];
+  const [seed, setSeed] = useState(1);
   const [map, setMap] = useState<Record<string, string>>({});
-  const decoded = cipher.replace(/[A-Z]/g, (letter) => map[letter] || "_");
+  const [message, setMessage] = useState("Mapeie as letras da cifra para decifrar a frase.");
+  const dictionary = useWordLibrary();
+  const puzzle = useMemo(() => buildCryptogramPuzzle(dictionary, seed), [dictionary, seed]);
+  const cipherLetters = useMemo(() => Array.from(new Set(puzzle.cipher.replace(/[^A-Z]/g, "").split("")), [puzzle.cipher]);
+  const decoded = puzzle.cipher.replace(/[A-Z]/g, (letter) => map[letter] || "_");
+  useEffect(() => {
+    setMap({});
+    setMessage("Mapeie as letras da cifra para decifrar a frase.");
+  }, [puzzle.phrase, puzzle.cipher]);
+
   function check() {
-    if (decoded === cryptPhrase) emit(record, "solo", "Criptograma decifrado", 1000);
+    const isComplete = decoded === puzzle.phrase;
+    setMessage(isComplete ? "Frase decifrada! Boa!" : "Ainda não decifrou a frase.");
+    if (isComplete) emit(record, "solo", "Criptograma decifrado", 1000);
   }
   return (
     <GameFrame
-      status={`Cifra: ${cipher} | Decifrado: ${decoded}`}
-      actions={<Button tone="primary" onClick={check}>Verificar</Button>}
+      status={`${message} | Cifra: ${puzzle.cipher}`}
+      actions={
+        <>
+          <Button
+            tone="primary"
+            onClick={() => {
+              setMap({});
+              setMessage("Mapeie as letras da cifra para decifrar a frase.");
+              setSeed((value) => value + 1);
+            }}
+          >
+            Nova cifra
+          </Button>
+          <Button tone="primary" onClick={check}>
+            Verificar
+          </Button>
+        </>
+      }
     >
       <div className="grid gap-2 sm:grid-cols-4 md:grid-cols-8">
         {cipherLetters.map((letter) => (
@@ -822,34 +1225,39 @@ function Cryptogram({ record }: ExpandedGameProps) {
 }
 
 const stopCategories = ["Nome", "País", "Animal", "Comida", "Objeto"];
-const stopAnswers: Record<string, string[]> = {
-  L: ["Lucas", "Laos", "Lobo", "Lasanha", "Lápis"],
-  B: ["Bruno", "Brasil", "Baleia", "Bolo", "Bola"],
-  C: ["Caio", "Chile", "Cavalo", "Carne", "Copo"],
+type StopRound = {
+  letter: string;
+  answers: Record<string, string>;
 };
 
 function StopGame({ record }: ExpandedGameProps) {
   const [mode, setMode] = useState<PlayMode>("solo");
-  const [letter, setLetter] = useState<keyof typeof stopAnswers>("L");
+  const [seed, setSeed] = useState(1);
   const [values, setValues] = useState<Record<string, string>>({});
   const [score, setScore] = useState<number | null>(null);
-  function newRound() {
-    const letters = Object.keys(stopAnswers) as Array<keyof typeof stopAnswers>;
-    setLetter(letters[(letters.indexOf(letter) + 1) % letters.length]);
+  const dictionary = useWordLibrary();
+  const round = useMemo(() => buildStopRound(dictionary, seed) as StopRound, [dictionary, seed]);
+
+  useEffect(() => {
     setValues({});
     setScore(null);
+  }, [round]);
+
+  function newRound() {
+    setSeed((value) => value + 1);
   }
   function finishRound() {
-    const total = stopCategories.reduce((sum, category, i) => {
+    const total = stopCategories.reduce((sum, category) => {
       const answer = values[category]?.trim().toLowerCase();
-      return sum + (answer && answer[0] === letter.toLowerCase() && stopAnswers[letter][i].toLowerCase() === answer ? 10 : answer?.[0] === letter.toLowerCase() ? 5 : 0);
+      const expected = round.answers[category]?.toLowerCase();
+      return sum + (answer && answer[0] === round.letter.toLowerCase() && expected === answer ? 10 : answer?.[0] === round.letter.toLowerCase() ? 5 : 0);
     }, 0);
     setScore(total);
     emit(record, mode === "local" ? "p1" : "solo", "Rodada de Stop encerrada", total);
   }
   return (
     <GameFrame
-      status={`Letra sorteada: ${letter}. ${score === null ? "Preencha as categorias." : `Pontuação: ${score}`}`}
+      status={`Letra sorteada: ${round.letter}. ${score === null ? "Preencha as categorias." : `Pontuação: ${score}`}`}
       actions={
         <>
           <Select label="Modo" value={mode} options={[{ value: "solo", label: "Solo" }, { value: "local", label: "2 jogadores" }]} onChange={setMode} />
@@ -1203,9 +1611,13 @@ function Hex({ record }: ExpandedGameProps) {
   }
   return (
     <GameFrame status="P1 conecta topo/base. P2 conecta esquerda/direita." actions={<><Select label="Modo" value={mode} options={modeChoices} onChange={setMode} /><Button onClick={() => setBoard(Array(size * size).fill(null))}>Reiniciar</Button></>}>
-      <div className="max-w-xl space-y-1 overflow-x-auto pb-1">
+      <div className="mx-auto grid w-full max-w-xl gap-1">
         {Array.from({ length: size }, (_, y) => (
-          <div key={y} className="flex gap-1" style={{ marginLeft: y * 10 }}>
+          <div
+            key={y}
+            className="mx-auto flex w-fit gap-1"
+            style={{ transform: `translateX(${(y % 2) * 6.5}%)` }}
+          >
             {Array.from({ length: size }, (_, x) => {
               const i = y * size + x;
               return <button key={i} type="button" onClick={() => play(i)} className={cx("h-10 w-10 shrink-0 rounded-xl border border-slate-300 bg-white font-black shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:h-12 sm:w-12", board[i] === 1 ? "bg-brand-500 text-black" : board[i] === 2 ? "bg-cyan-300 text-black" : "text-slate-950 dark:text-white")} />;
@@ -1680,20 +2092,20 @@ function DominoPieceChip({
       type="button"
       onClick={disabled ? undefined : onClick}
       className={cx(
-        "relative flex w-[clamp(3.6rem,14vw,5rem)] select-none items-center rounded-lg border border-slate-900/20 bg-white p-1 text-slate-950 transition dark:border-white/15 dark:bg-slate-900",
+        "relative flex w-[clamp(2.35rem,10.4vw,4rem)] select-none items-center rounded-md border border-slate-900/20 bg-white p-1 text-slate-950 transition sm:rounded-lg dark:border-white/15 dark:bg-slate-900",
         disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:scale-[1.02] active:scale-[0.99]",
         selected && "ring-2 ring-brand-500",
         className,
       )}
     >
       {hidden ? (
-        <span className="mx-auto h-full w-full rounded bg-gradient-to-br from-brand-500/80 to-brand-300 p-[0.33rem] text-[0.65rem] font-black uppercase text-black">?
+        <span className="mx-auto h-full w-full rounded bg-gradient-to-br from-brand-500/80 to-brand-300 p-[0.33rem] text-[0.65rem] font-black uppercase tracking-wide text-black">?
         </span>
       ) : (
         <span className="grid w-full">
-          <span className="grid h-7 place-items-center text-sm font-black">{tile[0]}</span>
+          <span className="grid h-5 place-items-center text-[0.65rem] font-black leading-none sm:h-6 sm:text-xs">{tile[0]}</span>
           <span className="h-[1px] bg-slate-900/40" />
-          <span className="grid h-7 place-items-center text-sm font-black">{tile[1]}</span>
+          <span className="grid h-5 place-items-center text-[0.65rem] font-black leading-none sm:h-6 sm:text-xs">{tile[1]}</span>
         </span>
       )}
     </button>
@@ -1892,12 +2304,12 @@ function Dominoes(props: ExpandedGameProps) {
               </div>
             )}
           </div>
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
             <div className="space-y-2">
               <p className="text-xs font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">
                 {dominoPickLabel(0, isLocal)} ({game.hands[0].length})
               </p>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {game.hands[0].map((tile, index) => {
                   const options = dominoMovesForTile(tile, chainOpen);
                   const playable = options.some((item) => item.index === -1) || !chainOpen;
@@ -1923,7 +2335,7 @@ function Dominoes(props: ExpandedGameProps) {
               <p className="text-xs font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">
                 {dominoPickLabel(1, isLocal)} ({game.hands[1].length})
               </p>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {(isLocal ? game.hands[1] : Array.from({ length: game.hands[1].length }).map((_, index) => [0, 0] as DominoTile)).map((tile, index) => {
                   const playable = isLocal ? dominoMovesForTile(tile, chainOpen).length > 0 : false;
                   const label = isLocal ? tile : [0, 0] as DominoTile;
@@ -2060,8 +2472,8 @@ function CardTable({
   className?: string;
 }) {
   const style = {
-    "--card-w": spider ? "clamp(2.35rem, 8vw, 3.8rem)" : compact ? "clamp(2.55rem, 10vw, 4.8rem)" : "clamp(2.75rem, 11vw, 5.8rem)",
-    "--fan-y": spider ? "clamp(1.05rem, 3.25vw, 1.75rem)" : compact ? "clamp(1.25rem, 3.8vw, 2.05rem)" : "clamp(1.55rem, 4.2vw, 2.55rem)",
+    "--card-w": spider ? "clamp(1.95rem, 8.2vw, 3.2rem)" : compact ? "clamp(2.2rem, 9vw, 4.2rem)" : "clamp(2.35rem, 9.5vw, 4.8rem)",
+    "--fan-y": spider ? "clamp(0.95rem, 2.8vw, 1.55rem)" : compact ? "clamp(1.1rem, 3.3vw, 1.75rem)" : "clamp(1.35rem, 3.7vw, 2.25rem)",
     "--card-gap": spider ? "0.3rem" : "clamp(0.32rem, 1vw, 0.65rem)",
   } as CSSProperties;
   return (
@@ -2089,6 +2501,7 @@ function CardViewport({
   const style = {
     "--card-w": `min(var(--card-w), calc((100% - (var(--card-gap) * ${Math.max(1, columns - 1)})) / ${columns})`,
     gridTemplateColumns: `repeat(${columns}, minmax(0, var(--card-w)))`,
+    justifyContent: "center",
     width: "100%",
   } as CSSProperties;
   return (
@@ -3497,11 +3910,50 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
   const [message, setMessage] = useState("Jogue uma carta. A manilha é definida pelo vira.");
   const [moves, setMoves] = useState(0);
   const [dealKey, setDealKey] = useState(0);
+  const [roundResultMessage, setRoundResultMessage] = useState<string | null>(null);
   const [draggedCard, setDraggedCard] = useState<CardCode | null>(null);
   const [draggedSide, setDraggedSide] = useState<TrucoSide | null>(null);
   const elapsed = useElapsedSeconds(!game.over, dealKey);
+  const roundResultTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (roundResultTimeoutRef.current) {
+        window.clearTimeout(roundResultTimeoutRef.current);
+        roundResultTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  function clearRoundResultMessage() {
+    if (roundResultTimeoutRef.current) {
+      window.clearTimeout(roundResultTimeoutRef.current);
+      roundResultTimeoutRef.current = null;
+    }
+    setRoundResultMessage(null);
+  }
+
+  function queueNextRound(score: { player: number; bot: number }) {
+    if (roundResultTimeoutRef.current) {
+      window.clearTimeout(roundResultTimeoutRef.current);
+      roundResultTimeoutRef.current = null;
+    }
+    const delay = 1050;
+    roundResultTimeoutRef.current = window.setTimeout(() => {
+      roundResultTimeoutRef.current = null;
+      setViewing("player");
+      setMoves(0);
+      setDraggedCard(null);
+      setDraggedSide(null);
+      setRoundResultMessage(null);
+      setMessage("Nova mão começando.");
+      setDealKey((value) => value + 1);
+      setGame(createTrucoState(score));
+    }, delay);
+  }
 
   function reset(score = { player: 0, bot: 0 }) {
+    clearRoundResultMessage();
     setGame(createTrucoState(score));
     setViewing("player");
     setMoves(0);
@@ -3528,13 +3980,27 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
     const playerWon = roundWins.player >= roundWins.bot;
     score[playerWon ? "player" : "bot"] += state.handValue;
     const over = score.player >= 12 || score.bot >= 12;
-    if (over) emit(record, score.player >= 12 ? "p1" : "machine", `Truco Paulista ${score.player} x ${score.bot}`, score.player * 100);
-    setMessage(playerWon ? `Você ganhou a mão e marcou ${state.handValue}.` : `IA ganhou a mão e marcou ${state.handValue}.`);
-    return { ...createTrucoState(score), over };
+    const handWinner: TrucoSide = playerWon ? "player" : "bot";
+    const scoreWinner: GameResult["winner"] = isLocal ? (score.player >= score.bot ? "p1" : "p2") : score.player >= score.bot ? "p1" : "machine";
+    const winnerLabel = isLocal ? trucoSideLabel(handWinner, true) : playerWon ? "Você" : "IA";
+    if (over)
+      emit(
+        record,
+        scoreWinner,
+        `Truco Paulista ${score.player} x ${score.bot}`,
+        score.player * 100,
+      );
+    const handMessage = `${winnerLabel} ganhou a mão e marcou ${state.handValue}.`;
+    const scoreMessage = `Placar ${score.player} x ${score.bot}.`;
+    setRoundResultMessage(`${handMessage} ${scoreMessage}`);
+    setMessage(`${handMessage} ${scoreMessage}`);
+    if (over) return { ...state, score, roundWins: { player: 0, bot: 0 }, table: [], playerTurn: true, over };
+    queueNextRound(score);
+    return { ...state, score, roundWins: { player: 0, bot: 0 }, table: [], playerTurn: true, over };
   }
 
   function playAi(card: CardCode) {
-    if (game.over || !game.playerTurn) return;
+    if (game.over || !game.playerTurn || Boolean(roundResultMessage)) return;
     setGame((state) => {
       const player = state.player.filter((item) => item !== card);
       const orderedBot = [...state.bot].sort((a, b) => trucoPower(a, state.vira) - trucoPower(b, state.vira));
@@ -3554,7 +4020,7 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
   }
 
   function playLocal(card: CardCode, side: TrucoSide) {
-    if (game.over || viewing !== side || game.playerTurn !== (side === "player")) return;
+    if (game.over || viewing !== side || game.playerTurn !== (side === "player") || Boolean(roundResultMessage)) return;
     setGame((state) => {
       if (state.over || state.playerTurn !== (side === "player")) return state;
       const hand = state[side];
@@ -3582,17 +4048,20 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
   }
 
   function play(card: CardCode, side: TrucoSide = "player") {
+    if (roundResultMessage) return;
     if (mode === "local") playLocal(card, side);
     else playAi(card);
   }
 
   function raise() {
+    if (roundResultMessage) return;
     const nextValue = game.handValue === 1 ? 3 : game.handValue === 3 ? 6 : game.handValue === 6 ? 9 : 12;
     setGame((state) => ({ ...state, handValue: nextValue }));
     setMessage(`Truco aceito. Mão agora vale ${nextValue}.`);
   }
 
   function showHint() {
+    if (roundResultMessage) return;
     const ordered = [...game.player].sort((a, b) => trucoPower(a, game.vira) - trucoPower(b, game.vira));
     const card = game.handValue >= 3 || game.roundWins.bot > game.roundWins.player ? ordered[ordered.length - 1] : ordered[0];
     setMessage(`Dica: ${game.handValue >= 3 ? "proteja a mão com" : "guarde força e jogue"} ${cardLabel(card)}.`);
@@ -3603,8 +4072,9 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
   const activeSide: TrucoSide = isLocal && viewing === "bot" ? "bot" : "player";
   const activeHand = isLocal ? (viewing ? game[viewing] : []) : game.player;
   const hiddenHand = isLocal ? (viewing === "bot" ? game.player : game.bot) : game.bot;
-  const canPlayActiveHand = isLocal ? viewing === currentSide && !game.over : game.playerTurn && !game.over;
-  const waitingForLocalPlayer = isLocal && !game.over && viewing !== currentSide;
+  const canPlayActiveHand = isLocal ? viewing === currentSide && !game.over && !roundResultMessage : game.playerTurn && !game.over && !roundResultMessage;
+  const waitingForLocalPlayer = isLocal && !game.over && !roundResultMessage && viewing !== currentSide;
+  const isRoundSettling = Boolean(roundResultMessage);
 
   return (
     <GameFrame
@@ -3622,7 +4092,12 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
           />
           <Select label="Dificuldade" value={difficulty} options={difficultyChoices} onChange={setDifficulty} />
           {!isLocal && <Button onClick={showHint} tone="primary">Dica</Button>}
-          <Button onClick={raise} disabled={game.handValue === 12 || (isLocal && waitingForLocalPlayer)}>{game.handValue === 1 ? "Pedir truco" : game.handValue === 3 ? "Pedir seis" : game.handValue === 6 ? "Pedir nove" : "Pedir doze"}</Button>
+          <Button
+            onClick={raise}
+            disabled={game.handValue === 12 || isRoundSettling || (isLocal && waitingForLocalPlayer)}
+          >
+            {game.handValue === 1 ? "Pedir truco" : game.handValue === 3 ? "Pedir seis" : game.handValue === 6 ? "Pedir nove" : "Pedir doze"}
+          </Button>
           <Button onClick={() => reset()}>Reiniciar</Button>
         </>
       }
@@ -3638,6 +4113,14 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
               { label: "Nível", value: difficultyChoices.find((item) => item.value === difficulty)?.label ?? "Médio" },
             ]}
           />
+          {roundResultMessage ? (
+            <div className="grid rounded-xl border border-brand-500/30 bg-brand-500/10 p-3 text-center dark:border-brand-500/40 dark:bg-brand-500/20">
+              <span className="text-sm font-black uppercase tracking-tight text-brand-900 dark:text-brand-100">{roundResultMessage}</span>
+              <span className="text-xs text-brand-800 dark:text-brand-200">
+                {game.over ? "Jogo encerrado." : "Nova mão em instantes..."}
+              </span>
+            </div>
+          ) : null}
           <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
             <div className="grid justify-items-center gap-1">
               <div className="flex justify-center gap-1">{hiddenHand.map((_, index) => <CardView key={index} hidden />)}</div>
