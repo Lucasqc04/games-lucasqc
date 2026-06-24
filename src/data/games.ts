@@ -196,7 +196,7 @@ export const games: GameMeta[] = [
     icon: "⬚",
     modes: ["Contra máquina", "2 jogadores local"],
     rules: ["Feche o quarto lado de uma caixa para pontuar.", "Quem fecha uma caixa joga novamente."],
-    controls: ["Clique nas linhas entre pontos."],
+    controls: ["Escolha o tamanho do tabuleiro e clique nas linhas entre pontos."],
   },
   {
     id: "termo",

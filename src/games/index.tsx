@@ -3801,14 +3801,22 @@ function Sokoban({ record, sound }: GameComponentProps) {
 // 20. Pontos e Caixas
 type Edge = "h" | "v";
 type DotsEdge = { type: Edge; r: number; c: number };
-const dotsSize = 4;
+type DotBoardSize = "4" | "5" | "6" | "7";
+
+const dotsBoardSizeChoices: Choice<DotBoardSize>[] = [
+  { value: "4", label: "4x4 (3x3 caixas)" },
+  { value: "5", label: "5x5 (4x4 caixas)" },
+  { value: "6", label: "6x6 (5x5 caixas)" },
+  { value: "7", label: "7x7 (6x6 caixas)" },
+];
+
 function edgeKey(edge: DotsEdge) {
   return `${edge.type}-${edge.r}-${edge.c}`;
 }
-function allDotEdges() {
+function allDotEdges(size: number) {
   const edges: DotsEdge[] = [];
-  for (let r = 0; r < dotsSize; r += 1) for (let c = 0; c < dotsSize - 1; c += 1) edges.push({ type: "h", r, c });
-  for (let r = 0; r < dotsSize - 1; r += 1) for (let c = 0; c < dotsSize; c += 1) edges.push({ type: "v", r, c });
+  for (let r = 0; r < size; r += 1) for (let c = 0; c < size - 1; c += 1) edges.push({ type: "h", r, c });
+  for (let r = 0; r < size - 1; r += 1) for (let c = 0; c < size; c += 1) edges.push({ type: "v", r, c });
   return edges;
 }
 function boxEdges(r: number, c: number) {
@@ -3819,26 +3827,26 @@ function boxEdges(r: number, c: number) {
     edgeKey({ type: "v", r, c: c + 1 }),
   ];
 }
-function completedBoxes(edges: Set<string>, owners: Record<string, 1 | 2>) {
+function completedBoxes(size: number, edges: Set<string>, owners: Record<string, 1 | 2>) {
   const boxes: string[] = [];
-  for (let r = 0; r < dotsSize - 1; r += 1) {
-    for (let c = 0; c < dotsSize - 1; c += 1) {
+  for (let r = 0; r < size - 1; r += 1) {
+    for (let c = 0; c < size - 1; c += 1) {
       const key = `${r}-${c}`;
       if (!owners[key] && boxEdges(r, c).every((edge) => edges.has(edge))) boxes.push(key);
     }
   }
   return boxes;
 }
-function dotsAi(edges: Set<string>, owners: Record<string, 1 | 2>, difficulty: Difficulty) {
-  const available = allDotEdges().filter((edge) => !edges.has(edgeKey(edge)));
+function dotsAi(size: number, edges: Set<string>, owners: Record<string, 1 | 2>, difficulty: Difficulty) {
+  const available = allDotEdges(size).filter((edge) => !edges.has(edgeKey(edge)));
   if (difficulty === "easy") return randomItem(available);
-  const completes = available.find((edge) => completedBoxes(new Set([...edges, edgeKey(edge)]), owners).length > 0);
+  const completes = available.find((edge) => completedBoxes(size, new Set([...edges, edgeKey(edge)]), owners).length > 0);
   if (completes) return completes;
   if (difficulty !== "hard") return randomItem(available);
   const safe = available.filter((edge) => {
     const next = new Set([...edges, edgeKey(edge)]);
-    for (let r = 0; r < dotsSize - 1; r += 1) {
-      for (let c = 0; c < dotsSize - 1; c += 1) {
+    for (let r = 0; r < size - 1; r += 1) {
+      for (let c = 0; c < size - 1; c += 1) {
         if (!owners[`${r}-${c}`] && boxEdges(r, c).filter((item) => next.has(item)).length === 3) return false;
       }
     }
@@ -3850,12 +3858,16 @@ function dotsAi(edges: Set<string>, owners: Record<string, 1 | 2>, difficulty: D
 function DotsAndBoxes({ record, sound }: GameComponentProps) {
   const [mode, setMode] = useState<PlayMode>("ai");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [dotsSize, setDotsSize] = useState<DotBoardSize>("4");
   const [edges, setEdges] = useState<Set<string>>(new Set());
   const [owners, setOwners] = useState<Record<string, 1 | 2>>({});
   const [turn, setTurn] = useState<1 | 2>(1);
   const [ended, setEnded] = useState(false);
+  const boardSize = Number(dotsSize);
+  const gridDimension = boardSize >= 7 ? "h-7 w-7 sm:h-7 sm:w-7" : boardSize >= 6 ? "h-8 w-8 sm:h-9 sm:w-9" : "h-10 w-10 sm:h-10 sm:w-10";
 
-  function reset(nextMode = mode) {
+  function reset(nextMode = mode, nextSize = dotsSize) {
+    setDotsSize(nextSize);
     setMode(nextMode);
     setEdges(new Set());
     setOwners({});
@@ -3866,14 +3878,14 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
   function play(edge: DotsEdge, player = turn) {
     if (ended || edges.has(edgeKey(edge))) return;
     const nextEdges = new Set([...edges, edgeKey(edge)]);
-    const boxes = completedBoxes(nextEdges, owners);
+    const boxes = completedBoxes(boardSize, nextEdges, owners);
     const nextOwners = { ...owners };
     boxes.forEach((box) => {
       nextOwners[box] = player;
     });
     setEdges(nextEdges);
     setOwners(nextOwners);
-    if (Object.keys(nextOwners).length === (dotsSize - 1) * (dotsSize - 1)) {
+    if (Object.keys(nextOwners).length === (boardSize - 1) * (boardSize - 1)) {
       setEnded(true);
       const p1 = Object.values(nextOwners).filter((owner) => owner === 1).length;
       const p2 = Object.values(nextOwners).filter((owner) => owner === 2).length;
@@ -3883,9 +3895,9 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
 
   useEffect(() => {
     if (mode !== "ai" || turn !== 2 || ended) return;
-    const id = window.setTimeout(() => play(dotsAi(edges, owners, difficulty), 2), 450);
+    const id = window.setTimeout(() => play(dotsAi(boardSize, edges, owners, difficulty), 2), 450);
     return () => window.clearTimeout(id);
-  }, [difficulty, edges, ended, mode, owners, turn]);
+  }, [boardSize, difficulty, edges, ended, mode, owners, turn]);
 
   const p1 = Object.values(owners).filter((owner) => owner === 1).length;
   const p2 = Object.values(owners).filter((owner) => owner === 2).length;
@@ -3895,6 +3907,7 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
       <Controls>
         <Select label="Modo" value={mode} options={aiLocalModes} onChange={(value) => reset(value)} />
         {mode === "ai" && <Select label="Dificuldade" value={difficulty} options={difficultyChoices} onChange={setDifficulty} />}
+        <Select label="Tamanho" value={dotsSize} options={dotsBoardSizeChoices} onChange={(value) => reset(mode, value)} />
         <Button tone="primary" onClick={() => reset()}>
           Reiniciar
         </Button>
@@ -3906,9 +3919,9 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
           { label: "Turno", value: turn === 1 ? "Jogador 1" : mode === "ai" ? "Máquina" : "Jogador 2" },
         ]}
       />
-      <div className="game-board-panel mx-auto grid w-max rounded-lg p-4" style={{ gridTemplateColumns: `repeat(${dotsSize * 2 - 1}, 2.4rem)` }}>
-        {range(dotsSize * 2 - 1).flatMap((r) =>
-          range(dotsSize * 2 - 1).map((c) => {
+      <div className="game-board-panel mx-auto grid w-max rounded-lg p-4" style={{ gridTemplateColumns: `repeat(${boardSize * 2 - 1}, 2.4rem)` }}>
+        {range(boardSize * 2 - 1).flatMap((r) =>
+          range(boardSize * 2 - 1).map((c) => {
             const isDot = r % 2 === 0 && c % 2 === 0;
             const h = r % 2 === 0 && c % 2 === 1;
             const v = r % 2 === 1 && c % 2 === 0;
@@ -3922,7 +3935,7 @@ function DotsAndBoxes({ record, sound }: GameComponentProps) {
                 disabled={!edge || (mode === "ai" && turn === 2)}
                 onClick={() => edge && play(edge)}
                 className={cn(
-                  "game-cell h-10 w-10 overflow-hidden text-slate-950 dark:text-white",
+                  `game-cell overflow-hidden text-slate-950 dark:text-white ${gridDimension}`,
                   edge ? (!edges.has(edgeKey(edge)) ? "rounded hover:bg-brand-100 dark:hover:bg-cyan-300/25" : undefined) : undefined,
                   edge && edges.has(edgeKey(edge)) ? (h ? "border-y-4 border-brand-500 dark:border-cyan-300" : "border-x-4 border-brand-500 dark:border-cyan-300") : undefined,
                   box && owner === 1 && "bg-cyan-300/30",

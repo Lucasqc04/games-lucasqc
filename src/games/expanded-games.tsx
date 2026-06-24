@@ -219,31 +219,68 @@ function normalizePtWord(word: string) {
 }
 
 const connectionGroups = [
-  { name: "Cores", words: ["Laranja", "Preto", "Branco", "Verde"] },
-  { name: "Cartas", words: ["Copas", "Ouros", "Paus", "Espadas"] },
-  { name: "Games", words: ["Tetris", "Snake", "Pong", "Sokoban"] },
-  { name: "Brasil", words: ["Pix", "Truco", "Samba", "Feijoada"] },
+  { name: "Naipes", words: ["Copas", "Ouros", "Paus", "Espadas"] },
+  { name: "Cores", words: ["Vermelho", "Azul", "Amarelo", "Verde"] },
+  { name: "Jogos", words: ["Tetris", "Snake", "Pong", "Sokoban"] },
+  { name: "Direções", words: ["Norte", "Sul", "Leste", "Oeste"] },
+  { name: "Planetas", words: ["Mercurio", "Terra", "Marte", "Saturno"] },
+  { name: "Frutas", words: ["Maçã", "Banana", "Uva", "Limão"] },
+  { name: "Estações", words: ["Primavera", "Verão", "Outono", "Inverno"] },
+  { name: "Continentes", words: ["Ásia", "África", "Europa", "América"] },
+  { name: "Esportes", words: ["Futebol", "Vôlei", "Tênis", "Natação"] },
+  { name: "Linguagens", words: ["Python", "Java", "Ruby", "Rust"] },
+  { name: "Transporte", words: ["Ônibus", "Trem", "Avião", "Navio"] },
+  { name: "Metais", words: ["Ouro", "Prata", "Cobre", "Ferro"] },
 ];
+
+function createConnectionRound(seed: number) {
+  const usedWords = new Set<string>();
+  return shuffleSeeded(connectionGroups, seed).reduce<{
+    name: string;
+    words: string[];
+  }[]>((acc, group) => {
+    if (acc.length >= 4) return acc;
+    const hasDuplicate = group.words.some((word) => usedWords.has(word));
+    if (hasDuplicate) return acc;
+    group.words.forEach((word) => usedWords.add(word));
+    return [...acc, group];
+  }, []);
+}
 
 function Connections({ record }: ExpandedGameProps) {
   const [seed, setSeed] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
   const [found, setFound] = useState<string[]>([]);
   const [errors, setErrors] = useState(0);
-  const words = useMemo(() => shuffleSeeded(connectionGroups.flatMap((group) => group.words), seed), [seed]);
+  const [status, setStatus] = useState("Selecione 4 palavras por rodada.");
+  const groups = useMemo(() => createConnectionRound(seed), [seed]);
+  const words = useMemo(() => shuffleSeeded(groups.flatMap((group) => group.words), seed), [groups, seed]);
+  const groupsByName = useMemo(() => Object.fromEntries(groups.map((group) => [group.name, group])), [groups]);
+
+  const nextCandidate = useMemo(() => {
+    if (!selected.length) return null;
+    return groups.find((item) => !found.includes(item.name) && selected.every((word) => item.words.includes(word)));
+  }, [found, groups, selected]);
+  const invalidSelected = selected.length === 4 && !nextCandidate;
+
+  function isSolvedWord(word: string) {
+    return found.some((name) => groups.find((group) => group.name === name)?.words.includes(word));
+  }
 
   function submit() {
     if (selected.length !== 4) return;
-    const group = connectionGroups.find((item) => item.words.every((word) => selected.includes(word)));
-    if (!group || found.includes(group.name)) {
+    const group = groups.find((item) => item.words.every((word) => selected.includes(word)) && !found.includes(item.name));
+    if (!group) {
       setErrors((value) => value + 1);
+      setStatus("Tentativa inválida. Essas quatro palavras não formam um grupo desta rodada.");
       setSelected([]);
       return;
     }
     const next = [...found, group.name];
     setFound(next);
+    setStatus(`Grupo encontrado: ${group.name}.`);
     setSelected([]);
-    if (next.length === connectionGroups.length) emit(record, "solo", "Conexões concluído", 1000 - errors * 100);
+    if (next.length === groups.length) emit(record, "solo", "Conexões concluído", 1000 - errors * 100);
   }
 
   function reset() {
@@ -251,11 +288,12 @@ function Connections({ record }: ExpandedGameProps) {
     setSelected([]);
     setFound([]);
     setErrors(0);
+    setStatus("Selecione 4 palavras por rodada.");
   }
 
   return (
     <GameFrame
-      status={`${found.length}/4 grupos encontrados. Erros: ${errors}/4.`}
+      status={`${found.length}/${groups.length} grupos encontrados. Erros: ${errors}. ${status}`}
       actions={
         <>
           <Button tone="primary" disabled={selected.length !== 4} onClick={submit}>
@@ -268,12 +306,21 @@ function Connections({ record }: ExpandedGameProps) {
       <div className="space-y-3">
         {found.map((name) => (
           <div key={name} className="rounded-xl border border-emerald-600/30 bg-emerald-50 p-3 text-sm font-black text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100">
-            {name}: {connectionGroups.find((item) => item.name === name)?.words.join(", ")}
+            {name}: {groupsByName[name]?.words.join(", ")}
           </div>
         ))}
+        <div className="rounded-xl border border-brand-500/30 bg-brand-500/10 p-3">
+          <p className="text-xs font-black uppercase text-brand-800 dark:text-brand-100">Seleção atual</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+            {selected.length ? selected.join(", ") : "Sem palavras selecionadas."}
+          </p>
+          <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+            {invalidSelected ? "As 4 palavras não formam nenhum grupo desta rodada." : nextCandidate ? `Possível grupo: ${nextCandidate.name}.` : ""}
+          </p>
+        </div>
         <div className="grid gap-2 sm:grid-cols-4">
           {words.map((word) => {
-            const solved = found.some((name) => connectionGroups.find((group) => group.name === name)?.words.includes(word));
+            const solved = isSolvedWord(word);
             return (
               <button
                 key={word}
@@ -293,6 +340,14 @@ function Connections({ record }: ExpandedGameProps) {
       </div>
     </GameFrame>
   );
+}
+
+function isValidWordForSearch(word: string) {
+  const hasLength = /^[A-Z]{4,12}$/.test(word);
+  if (!hasLength) return false;
+  if (new Set(word).size <= 1) return false;
+  if (/(.)\1{3,}/.test(word)) return false;
+  return true;
 }
 
 type WordSearchSize = "small" | "medium" | "large";
@@ -399,7 +454,7 @@ function WordSearch({ record }: ExpandedGameProps) {
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("wordlist"))))
       .then((words: string[]) => {
         if (cancelled) return;
-        setPool(Array.from(new Set([...wordSearchExtraWords, ...words.map(normalizePtWord).filter((word) => /^[A-Z]{4,12}$/.test(word))])));
+        setPool(Array.from(new Set([...wordSearchExtraWords, ...words.map(normalizePtWord).filter(isValidWordForSearch)])));
       })
       .catch(() => undefined);
     return () => {
