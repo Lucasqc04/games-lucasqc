@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { GameGuideDrawer } from "@/components/games/game-guide-drawer";
 import { GAME_COMPONENTS } from "@/src/games";
 import type { GameMeta, GameResult, GameStats, HubState } from "@/src/types";
 import { addRecent, loadState, recordResult, saveState } from "@/src/lib/storage";
@@ -67,6 +68,7 @@ export function GameStage({ game, title }: GameStageProps) {
             >
               Som {sound ? "on" : "off"}
             </button>
+            <GameGuideDrawer game={game} />
             <Link href="/" className="grid h-8 place-items-center rounded-lg bg-brand-500 px-2 text-xs font-black text-black sm:h-9 sm:px-2.5 sm:text-sm">
               Catálogo
             </Link>
