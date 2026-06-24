@@ -1,0 +1,55 @@
+{
+  "name": "LucasQC Games",
+  "short_name": "Games",
+  "description": "Jogos classicos completos direto no navegador, com suporte offline via PWA.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#050505",
+  "theme_color": "#ff6a00",
+  "categories": ["games", "entertainment"],
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/lucasqc-games-logo.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Biblioteca",
+      "short_name": "Jogos",
+      "url": "/jogos",
+      "icons": [{ "src": "/lucasqc-games-logo.png", "sizes": "1254x1254" }]
+    },
+    {
+      "name": "Estatisticas",
+      "short_name": "Stats",
+      "url": "/estatisticas",
+      "icons": [{ "src": "/lucasqc-games-logo.png", "sizes": "1254x1254" }]
+    },
+    {
+      "name": "Snake",
+      "short_name": "Snake",
+      "url": "/jogos/snake",
+      "icons": [{ "src": "/lucasqc-games-logo.png", "sizes": "1254x1254" }]
+    },
+    {
+      "name": "Tetris",
+      "short_name": "Tetris",
+      "url": "/jogos/tetris",
+      "icons": [{ "src": "/lucasqc-games-logo.png", "sizes": "1254x1254" }]
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --brand: #ff6a00;
+  --brand-soft: #ff8a1c;
+  --ink: #050505;
+  --paper: #ffffff;
+  --app-bg:
+    linear-gradient(180deg, #fff7ed 0%, #ffffff 22rem, #f8fafc 100%);
+  --app-text: #0f172a;
+  --muted-text: #475569;
+  --surface-border: rgba(15, 23, 42, 0.14);
+  --surface-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 247, 237, 0.72)),
+    rgba(255, 255, 255, 0.94);
+  --surface-shadow: 0 18px 55px rgba(15, 23, 42, 0.1);
+  --game-stage-bg: rgba(255, 255, 255, 0.55);
+  --game-panel-bg: rgba(255, 255, 255, 0.88);
+  --game-panel-border: rgba(15, 23, 42, 0.16);
+  --empty-cell-bg: #e2e8f0;
+}
+
+html.dark {
+  color-scheme: dark;
+  --app-bg:
+    linear-gradient(135deg, #0b0f17 0%, #151a24 48%, #080b10 100%);
+  --app-text: #f8fafc;
+  --muted-text: #cbd5e1;
+  --surface-border: rgba(255, 255, 255, 0.14);
+  --surface-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035)),
+    rgba(10, 12, 18, 0.9);
+  --surface-shadow: 0 18px 70px rgba(0, 0, 0, 0.34);
+  --game-stage-bg: rgba(0, 0, 0, 0.22);
+  --game-panel-bg: rgba(10, 12, 18, 0.78);
+  --game-panel-border: rgba(255, 255, 255, 0.14);
+  --empty-cell-bg: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(255, 106, 0, 0.85);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #ff6a00;
+  color: #050505;
+}
+
+.surface {
+  border: 1px solid var(--surface-border);
+  background: var(--surface-bg);
+  box-shadow: var(--surface-shadow);
+}
+
+.game-cell {
+  display: grid;
+  place-items: center;
+  user-select: none;
+}
+
+.game-board-panel {
+  border: 1px solid var(--game-panel-border);
+  background: var(--game-panel-bg);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.1);
+}
+
+.dark .game-board-panel {
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
+}
+
+.game-stage-shell {
+  background: var(--game-stage-bg);
+}
+
+.termo-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--termo-board-min), var(--termo-board-width)));
+}
+
+.termo-tile {
+  touch-action: manipulation;
+  will-change: transform;
+}
+
+.termo-tile-pop {
+  animation: termo-pop 105ms ease-out;
+}
+
+.termo-tile-reveal {
+  animation: termo-flip 440ms ease both;
+  animation-delay: calc(var(--i) * 62ms);
+}
+
+.termo-board-shake {
+  animation: termo-shake 280ms ease both;
+}
+
+@keyframes termo-pop {
+  0% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes termo-flip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  48% {
+    transform: rotateX(88deg);
+  }
+  52% {
+    transform: rotateX(88deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes termo-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(7px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.prose-games h2 {
+  margin-top: 2rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: var(--app-text);
+}
+
+.prose-games p,
+.prose-games li {
+  color: var(--muted-text);
+  line-height: 1.75;
+}
+
+.prose-games ul {
+  margin-top: 0.75rem;
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}

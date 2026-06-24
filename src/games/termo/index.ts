@@ -1,0 +1,1 @@
+export { Termo } from "./Game";
