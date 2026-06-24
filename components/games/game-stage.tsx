@@ -75,7 +75,7 @@ export function GameStage({ game, title }: GameStageProps) {
           </div>
         </div>
 
-        <div className="game-board-panel min-h-0 flex-1 overflow-auto rounded-xl p-1 md:p-2">
+        <div className="game-board-panel min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-xl p-1 md:p-2">
           <div className="mx-auto flex min-h-full w-full max-w-[1920px] items-stretch justify-center">
             {hub && Component ? <Component record={onResult} stats={stats!} sound={sound} /> : <LoadingGame />}
           </div>

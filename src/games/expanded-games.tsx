@@ -29,6 +29,9 @@ function cx(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+const DRAG_GHOST_IMAGE =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
 type Direction = "up" | "down" | "left" | "right";
 const arrowRotation: Record<Direction, string> = {
   left: "0deg",
@@ -153,7 +156,7 @@ function Select<T extends string>({
 
 function ScoreStrip({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+    <div className="flex flex-wrap gap-2">
       {items.map((item) => (
         <div key={item.label} className="min-w-[7.5rem] rounded-xl border border-slate-200 bg-slate-950/[0.04] px-3 py-2 dark:border-white/10 dark:bg-white/[0.06]">
           <span className="block text-xs font-black uppercase text-slate-600 dark:text-slate-500">{item.label}</span>
@@ -655,6 +658,15 @@ function Anagrams({ record }: ExpandedGameProps) {
 const beeLetters = ["A", "R", "T", "C", "O", "S", "L"];
 const beeCenter = "A";
 const beeWords = ["CARTA", "CARO", "CASA", "SALA", "ALTO", "ROTA", "TALA", "COSTA", "LASTRO"];
+const beeBoardSlots = [
+  { letter: beeCenter, left: "50%", top: "50%", center: true },
+  { letter: "T", left: "82%", top: "23%" },
+  { letter: "C", left: "93%", top: "50%" },
+  { letter: "O", left: "82%", top: "78%" },
+  { letter: "S", left: "50%", top: "92%" },
+  { letter: "L", left: "18%", top: "78%" },
+  { letter: "R", left: "7%", top: "50%" },
+];
 
 function SpellingBee({ record }: ExpandedGameProps) {
   const [input, setInput] = useState("");
@@ -677,20 +689,65 @@ function SpellingBee({ record }: ExpandedGameProps) {
       status={`Encontradas ${found.length}/${beeWords.length}. ${message}`}
       actions={
         <>
-          <TextInput value={input} onChange={setInput} placeholder="palavra" />
-          <Button tone="primary" onClick={() => submit()}>Enviar</Button>
+          <TextInput value={input} onChange={setInput} placeholder="Digite sua palavra..." />
+          <Button tone="primary" onClick={() => submit()}>Entrar</Button>
+          <Button onClick={() => { setFound([]); setInput(""); setMessage("Palavras resetadas."); }}>Recomeçar</Button>
         </>
       }
     >
-      <div className="flex flex-wrap gap-2">
-        {beeLetters.map((letter) => (
-          <Button key={letter} tone={letter === beeCenter ? "primary" : "default"} onClick={() => setInput((value) => value + letter)}>
-            {letter}
-          </Button>
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {found.map((word) => <span key={word} className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-100">{word}</span>)}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div className="mx-auto flex w-full max-w-[24rem] flex-col justify-center gap-4">
+          <div className="relative mx-auto aspect-square w-full">
+            {beeBoardSlots.map((slot, index) => (
+              <button
+                key={`${index}-${slot.letter}`}
+                type="button"
+                onClick={() => setInput((value) => value + slot.letter)}
+                className={cx(
+                  "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-900/20 bg-white px-0 text-center font-black transition hover:scale-105",
+                  slot.center ? "grid h-16 w-16 text-lg shadow-md ring-2 ring-brand-500" : "grid h-12 w-12 text-base",
+                  slot.center ? "dark:bg-slate-200 dark:text-slate-950" : "",
+                )}
+                style={{ left: slot.left, top: slot.top }}
+              >
+                {slot.letter}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {beeBoardSlots.map((slot) => (
+              <Button key={slot.letter} tone={slot.center ? "primary" : "default"} onClick={() => setInput((value) => value + slot.letter)}>
+                {slot.letter}
+              </Button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => setInput("")}>Limpar</Button>
+            <input
+              value={input}
+              onChange={(event) => setInput(event.target.value.toUpperCase())}
+              className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-black uppercase text-slate-950 placeholder:text-slate-500 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
+              placeholder="Digite a palavra"
+            />
+            <div className="col-span-2 text-right text-xs text-slate-500 dark:text-slate-400">
+              Letras aceitas: 9 (ex.: {beeWords[0]})
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.06]">
+          <h2 className="text-sm font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">Palavras encontradas</h2>
+          <div className="mt-3 grid min-h-[16rem] gap-2 overflow-auto rounded-lg bg-slate-950/[0.03] p-2 dark:bg-white/[0.04]">
+            {found.length ? (
+              found.map((word) => (
+                <span key={word} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100">
+                  {word}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-400">As palavras vão aparecendo aqui conforme você acerta.</p>
+            )}
+          </div>
+        </div>
       </div>
     </GameFrame>
   );
@@ -1430,8 +1487,479 @@ function Ludo(props: ExpandedGameProps) {
   return <RuleActionGame name="Ludo" record={props.record} labels={["rolar dado", "sair da base com 6", "avançar peça", "captura adversário", "entrar na reta final", "chegar ao centro"]} />;
 }
 
+type DominoTile = [number, number];
+type DominoPlayer = 0 | 1;
+type DominoPlacement = { left: number; right: number; tile: DominoTile; owner: DominoPlayer };
+type DominoMove = { index: number; side: "left" | "right" };
+type DominoRoundResult = DominoPlayer | "draw";
+type DominoState = {
+  stock: DominoTile[];
+  hands: [DominoTile[], DominoTile[]];
+  chain: DominoPlacement[];
+  turn: DominoPlayer;
+  passes: number;
+  scores: [number, number];
+  roundResult: DominoRoundResult | null;
+  over: boolean;
+};
+
+const dominoValues = [0, 1, 2, 3, 4, 5, 6];
+const dominoTargetScore = 3;
+
+function createDominoDeck() {
+  const tiles: DominoTile[] = [];
+  for (let a = 0; a <= 6; a += 1) {
+    for (let b = a; b <= 6; b += 1) tiles.push([a, b]);
+  }
+  return shuffleSeeded(tiles, Date.now());
+}
+
+function createDominoState(scores: [number, number] = [0, 0], starter: DominoPlayer = 0): DominoState {
+  const deck = createDominoDeck();
+  const hands: [DominoTile[], DominoTile[]] = [
+    deck.splice(0, 7),
+    deck.splice(0, 7),
+  ];
+  return {
+    stock: deck,
+    hands,
+    chain: [],
+    turn: starter,
+    passes: 0,
+    scores,
+    roundResult: null,
+    over: false,
+  };
+}
+
+function dominoChainOpen(state: DominoState): [number, number] | null {
+  if (!state.chain.length) return null;
+  return [state.chain[0].left, state.chain[state.chain.length - 1].right];
+}
+
+function dominoMovesForTile(tile: DominoTile, chain: [number, number] | null) {
+  if (!chain) return [{ index: -1, side: "left" } as DominoMove];
+  const [left, right] = chain;
+  const moves: DominoMove[] = [];
+  if (tile[0] === left || tile[1] === left) moves.push({ index: -1, side: "left" });
+  if (tile[0] === right || tile[1] === right) moves.push({ index: -1, side: "right" });
+  return moves;
+}
+
+function dominoMovesForHand(hand: DominoTile[], chain: [number, number] | null): DominoMove[] {
+  if (!chain) return hand.flatMap((_, index) => ({ index, side: "left" as const }));
+  return hand.flatMap((tile, index) => {
+    const moves: DominoMove[] = [];
+    if (tile[0] === chain[0] || tile[1] === chain[0]) moves.push({ index, side: "left" });
+    if (tile[0] === chain[1] || tile[1] === chain[1]) moves.push({ index, side: "right" });
+    return moves;
+  });
+}
+
+function dominoHasMove(hand: DominoTile[], chain: [number, number] | null) {
+  return dominoMovesForHand(hand, chain).length > 0;
+}
+
+function dominoHandSum(hand: DominoTile[]) {
+  return hand.reduce((sum, [a, b]) => sum + a + b, 0);
+}
+
+function dominoPlace(state: DominoState, player: DominoPlayer, move: DominoMove) {
+  if (state.roundResult || state.over) return null;
+  const [chainLeft, chainRight] = dominoChainOpen(state) ?? [null, null];
+  const hand = state.hands[player];
+  const tile = hand[move.index];
+  if (!tile) return null;
+  const remaining = hand.filter((_, index) => index !== move.index);
+  const chain = [...state.chain];
+  const nextState = {
+    ...state,
+    hands: player === 0 ? [remaining, [...state.hands[1]]] : [[...state.hands[0]], remaining],
+    passes: 0,
+    chain: chain,
+    turn: player === 0 ? 1 as const : 0 as const,
+    roundResult: null as null,
+  };
+  if (!chain.length) {
+    nextState.chain = [{ left: tile[0], right: tile[1], tile, owner: player }];
+    return nextState;
+  }
+  const left = chain[0]!.left;
+  const right = chain[chain.length - 1]!.right;
+  if (move.side === "left") {
+    if (tile[0] === left) {
+      nextState.chain = [{ left: tile[1], right: tile[0], tile, owner: player }, ...chain];
+      return nextState;
+    }
+    if (tile[1] === left) {
+      nextState.chain = [{ left: tile[0], right: tile[1], tile, owner: player }, ...chain];
+      return nextState;
+    }
+    return null;
+  }
+  if (tile[0] === right) {
+    nextState.chain = [...chain, { left: tile[0], right: tile[1], tile, owner: player }];
+    return nextState;
+  }
+  if (tile[1] === right) {
+    nextState.chain = [...chain, { left: tile[1], right: tile[0], tile, owner: player }];
+    return nextState;
+  }
+  return null;
+}
+
+function resolveDominoRound(state: DominoState, justPlayed: DominoPlayer | null): DominoState {
+  if (!state.chain.length) return state;
+  if (justPlayed !== null && state.hands[justPlayed].length === 0) {
+    const winner = justPlayed;
+    const scores = [...state.scores] as [number, number];
+    scores[winner] += 1;
+    const over = scores[winner] >= dominoTargetScore;
+    return { ...state, scores, over, roundResult: winner, chain: state.chain, turn: winner, passes: 0 };
+  }
+  const chain = dominoChainOpen(state);
+  if (!chain) return state;
+  if (state.stock.length === 0 && !dominoHasMove(state.hands[0], chain) && !dominoHasMove(state.hands[1], chain) && state.passes >= 2) {
+    const leftSum = dominoHandSum(state.hands[0]);
+    const rightSum = dominoHandSum(state.hands[1]);
+    const winner: DominoRoundResult = leftSum === rightSum ? "draw" : leftSum < rightSum ? 0 : 1;
+    const scores = [...state.scores] as [number, number];
+    if (winner !== "draw") scores[winner] += 1;
+    const over = winner !== "draw" && scores[winner] >= dominoTargetScore;
+    return { ...state, scores, over, roundResult: winner, turn: winner === "draw" ? 0 : winner, passes: 0 };
+  }
+  return state;
+}
+
+function dominoSelectMove(state: DominoState, difficulty: Difficulty, player: DominoPlayer): DominoMove | null {
+  const chain = dominoChainOpen(state);
+  const moves = dominoMovesForHand(state.hands[player], chain);
+  if (!moves.length) return null;
+  if (difficulty === "easy") return moves[0];
+  if (difficulty === "medium") {
+    const best = moves.reduce((bestIndex, candidate) => {
+      const tile = state.hands[player][candidate.index];
+      if (!tile) return bestIndex;
+      const value = tile[0] + tile[1];
+      const bestTile = state.hands[player][moves[bestIndex]?.index];
+      if (!bestTile) return moves.indexOf(candidate);
+      return value > bestTile[0] + bestTile[1] ? moves.indexOf(candidate) : bestIndex;
+    }, 0);
+    return moves[best];
+  }
+  return [...moves].sort((a, b) => {
+    const aTile = state.hands[player][a.index];
+    const bTile = state.hands[player][b.index];
+    if (!aTile || !bTile) return 0;
+    return (bTile[0] + bTile[1]) - (aTile[0] + aTile[1]);
+  })[0];
+}
+
+function dominoPickLabel(player: DominoPlayer, isLocal: boolean) {
+  if (!isLocal) return player === 0 ? "Você" : "IA";
+  return player === 0 ? "Jogador 1" : "Jogador 2";
+}
+
+function DominoPieceChip({
+  tile,
+  onClick,
+  selected,
+  disabled,
+  hidden,
+  className,
+}: {
+  tile: DominoTile;
+  onClick?: () => void;
+  selected?: boolean;
+  disabled?: boolean;
+  hidden?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      className={cx(
+        "relative flex w-[clamp(3.6rem,14vw,5rem)] select-none items-center rounded-lg border border-slate-900/20 bg-white p-1 text-slate-950 transition dark:border-white/15 dark:bg-slate-900",
+        disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:scale-[1.02] active:scale-[0.99]",
+        selected && "ring-2 ring-brand-500",
+        className,
+      )}
+    >
+      {hidden ? (
+        <span className="mx-auto h-full w-full rounded bg-gradient-to-br from-brand-500/80 to-brand-300 p-[0.33rem] text-[0.65rem] font-black uppercase text-black">?
+        </span>
+      ) : (
+        <span className="grid w-full">
+          <span className="grid h-7 place-items-center text-sm font-black">{tile[0]}</span>
+          <span className="h-[1px] bg-slate-900/40" />
+          <span className="grid h-7 place-items-center text-sm font-black">{tile[1]}</span>
+        </span>
+      )}
+    </button>
+  );
+}
+
+type DominoMoveSelection = { index: number; player: DominoPlayer } | null;
+
 function Dominoes(props: ExpandedGameProps) {
-  return <RuleActionGame name="Dominó" record={props.record} labels={["jogar na esquerda", "jogar na direita", "comprar peça", "passar", "fechar rodada", "bater"]} />;
+  const [mode, setMode] = useState<PlayMode>("ai");
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [game, setGame] = useState(createDominoState);
+  const [moves, setMoves] = useState(0);
+  const [selection, setSelection] = useState<DominoMoveSelection>(null);
+  const [message, setMessage] = useState("Arraste/toque uma peça e jogue nas pontas livres.");
+  const [dealKey, setDealKey] = useState(0);
+  const elapsed = useElapsedSeconds(!game.over && game.roundResult === null, dealKey);
+
+  function reset() {
+    setGame(createDominoState());
+    setSelection(null);
+    setMoves(0);
+    setDealKey((value) => value + 1);
+    setMessage("Novo dominó iniciado.");
+  }
+
+  function nextRound() {
+    if (game.roundResult === null) return;
+    const starter = game.roundResult === "draw" ? game.turn : game.roundResult;
+    setGame((state) => createDominoState(state.scores, starter));
+    setSelection(null);
+    setMoves(0);
+    setDealKey((value) => value + 1);
+    setMessage("Nova rodada começando.");
+  }
+
+  function playForAI() {
+    const state = game;
+    if (mode !== "ai" || state.over || state.roundResult !== null || state.turn !== 1) return;
+    const chain = dominoChainOpen(state);
+    const move = dominoSelectMove(state, difficulty, 1);
+    const movesForAI = dominoMovesForHand(state.hands[1], chain);
+    if (move) {
+      const next = dominoPlace(state, 1, move);
+      if (!next) return;
+      const withResult = resolveDominoRound(next, 1);
+      setGame(withResult);
+      setMoves((value) => value + 1);
+      setMessage("IA jogou.");
+      return;
+    }
+    if (state.stock.length > 0) {
+      const card = state.stock[0];
+      const nextStock = state.stock.slice(1);
+      const nextHands = [...state.hands[1]] as DominoTile[];
+      nextHands.push(card);
+      const afterDraw: DominoState = {
+        ...state,
+        stock: nextStock,
+        hands: [state.hands[0], nextHands],
+      };
+      const moveAfterDraw = dominoSelectMove(afterDraw, difficulty, 1);
+      if (moveAfterDraw) {
+        const played = dominoPlace(afterDraw, 1, moveAfterDraw);
+        if (played) {
+          const withResult = resolveDominoRound(played, 1);
+          setGame(withResult);
+          setMessage("IA comprou e jogou.");
+          setMoves((value) => value + 1);
+          setSelection(null);
+          return;
+        }
+      }
+      const passed = { ...afterDraw, passes: state.passes + 1, turn: 0 as const };
+      const settled = resolveDominoRound(passed, null);
+      setGame(settled);
+      setMessage("IA não tinha peça. Comprou e passou.");
+      return;
+    }
+    const passed = { ...state, passes: state.passes + 1, turn: 0 as const };
+    const settled = resolveDominoRound(passed, null);
+    setGame(settled);
+    setMessage("IA não tinha peça e passou.");
+  }
+
+  useEffect(() => {
+    if (mode !== "ai" || game.turn !== 1 || game.over || game.roundResult !== null) return;
+    const timer = window.setTimeout(playForAI, difficulty === "hard" ? 240 : difficulty === "easy" ? 620 : 390);
+    return () => window.clearTimeout(timer);
+  }, [difficulty, game, mode, game.turn]);
+
+  function tryPass(player: DominoPlayer) {
+    if (game.over || game.roundResult !== null || game.turn !== player) return;
+    const next: DominoState = { ...game, passes: game.passes + 1, turn: player === 0 ? 1 : 0, passes: game.passes + 1 };
+    const settled = resolveDominoRound(next, null);
+    setGame(settled);
+    setSelection(null);
+    setMessage(`Jogador ${player + 1} passou.`);
+  }
+
+  function drawForPlayer(player: DominoPlayer) {
+    if (game.over || game.roundResult !== null || game.turn !== player || game.stock.length === 0) return;
+    const tile = game.stock[0];
+    if (!tile) return;
+    const nextHands: [DominoTile[], DominoTile[]] = [ [...game.hands[0]], [...game.hands[1]] ];
+    nextHands[player] = [...nextHands[player], tile];
+    setGame((state) => ({ ...state, stock: state.stock.slice(1), hands: nextHands }));
+    setMessage(`${dominoPickLabel(player, mode === "local")} comprou uma peça.`);
+  }
+
+  function setPlayerMove(index: number, side?: "left" | "right") {
+    if (game.over || game.roundResult !== null) return;
+    const player = mode === "local" ? game.turn : 0;
+    const moveList = dominoMovesForHand(game.hands[player], dominoChainOpen(game));
+    const directMoves = moveList.filter((item) => item.index === index);
+    if (directMoves.length === 0) return;
+    if (directMoves.length === 1 || side) {
+      const next = dominoPlace(game, player, { index, side: side ?? directMoves[0].side });
+      if (!next) return;
+      const withResult = resolveDominoRound(next, player);
+      setGame(withResult);
+      setSelection(null);
+      setMoves((value) => value + 1);
+      setMessage(`${dominoPickLabel(player, mode === "local")} jogou ${next.chain[next.chain.length - 1]?.tile.join("-")} ${mode === "local" ? `(lado ${next.chain[next.chain.length - 1]?.owner === 0 ? "esquerdo" : ""})` : ""}`);
+      return;
+    }
+    setSelection({ index, player });
+    setMessage("Escolha a ponta para jogar.");
+  }
+
+  function placeSelection(side: "left" | "right") {
+    if (!selection) return;
+    setPlayerMove(selection.index, side);
+  }
+
+  const isLocal = mode === "local";
+  const chainOpen = dominoChainOpen(game);
+  const isTurnActive = game.over || game.roundResult !== null ? false : (mode === "local" ? game.turn === 0 || game.turn === 1 : true);
+  const movesForCurrent = dominoMovesForHand(game.hands[game.turn], chainOpen);
+  const canDraw = game.stock.length > 0;
+  const waitingRoundResult = game.roundResult;
+
+  return (
+    <GameFrame
+      status={`${message} Placar: ${game.scores[0]} x ${game.scores[1]}${game.roundResult ? ` • Rodada encerrada: ${game.roundResult === "draw" ? "empate" : `${dominoPickLabel(game.roundResult, isLocal)} venceu`}` : ""}`}
+      actions={
+        <>
+          <Select label="Modo" value={mode} options={modeChoices} onChange={(value) => {
+            setMode(value);
+            reset();
+          }} />
+          <Select label="Dificuldade" value={difficulty} options={difficultyChoices} onChange={setDifficulty} />
+          {!game.over && game.roundResult !== null ? <Button onClick={() => nextRound()}>Próxima rodada</Button> : null}
+          <Button onClick={() => reset()}>Reiniciar</Button>
+        </>
+      }
+    >
+      <CardTable compact>
+        <ScoreStrip
+          items={[
+            { label: "Tempo", value: formatClock(elapsed) },
+            { label: "Jogadas", value: moves },
+            { label: "Placar", value: `${game.scores[0]} x ${game.scores[1]}` },
+            { label: "Pé inicial", value: `${dominoPickLabel(game.turn, isLocal)} (${game.over ? "fim" : "agora"})` },
+          ]}
+        />
+        <CardViewport columns={1}>
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.06]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <div className="text-sm font-black uppercase text-slate-700 dark:text-slate-300">
+                Vira: {game.stock.length}
+              </div>
+              <div className="text-center">
+                <span className="text-xs font-black uppercase text-slate-600 dark:text-slate-400">Ponteiros</span>
+                <div className="mt-1 rounded-md border border-slate-900/20 bg-slate-50 px-3 py-1 text-sm font-black dark:border-white/20 dark:bg-black">
+                  {chainOpen ? `${chainOpen[0]} • ${chainOpen[1]}` : "jogue uma peça para abrir"}
+                </div>
+              </div>
+              <div className="text-sm font-black text-right text-slate-700 uppercase dark:text-slate-300">Mesa: {game.chain.length} peças</div>
+            </div>
+            <div className="flex min-h-16 flex-wrap justify-center gap-2 border border-slate-900/10 bg-slate-100/60 p-2 dark:border-white/15 dark:bg-black/20">
+              {game.chain.length ? (
+                game.chain.map((item, index) => (
+                  <DominoPieceChip key={`${item.tile.join("-")}-${index}`} tile={item.tile} className="shrink-0" />
+                ))
+              ) : (
+                <span className="inline-flex h-16 w-full items-center justify-center rounded-lg border border-slate-900/10 text-sm font-black uppercase text-slate-600 dark:border-white/15 dark:text-slate-300">
+                  Mesa vazia
+                </span>
+              )}
+            </div>
+            {selection && (
+              <div className="grid justify-center gap-2 sm:flex sm:justify-center sm:gap-2">
+                <Button onClick={() => placeSelection("left")}>Jogar na ponta esquerda</Button>
+                <Button onClick={() => placeSelection("right")}>Jogar na ponta direita</Button>
+              </div>
+            )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">
+                {dominoPickLabel(0, isLocal)} ({game.hands[0].length})
+              </p>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4">
+                {game.hands[0].map((tile, index) => {
+                  const options = dominoMovesForTile(tile, chainOpen);
+                  const playable = options.some((item) => item.index === -1) || !chainOpen;
+                  const selected = selection?.player === 0 && selection?.index === index;
+                  return (
+                    <DominoPieceChip
+                      key={`hand-0-${index}-${tile[0]}-${tile[1]}`}
+                      tile={tile}
+                      selected={selected}
+                      disabled={!isLocal ? false : !isTurnActive || game.turn !== 0}
+                      onClick={() => {
+                        if (!isLocal && game.turn !== 0) return;
+                        if (mode === "local" && game.turn !== 0) return;
+                        if (!playable) return;
+                        setPlayerMove(index);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">
+                {dominoPickLabel(1, isLocal)} ({game.hands[1].length})
+              </p>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4">
+                {(isLocal ? game.hands[1] : Array.from({ length: game.hands[1].length }).map((_, index) => [0, 0] as DominoTile)).map((tile, index) => {
+                  const playable = isLocal ? dominoMovesForTile(tile, chainOpen).length > 0 : false;
+                  const label = isLocal ? tile : [0, 0] as DominoTile;
+                  return (
+                    <DominoPieceChip
+                      key={`hand-1-${index}`}
+                      tile={label}
+                      hidden={!isLocal}
+                      disabled={mode !== "local" || game.turn !== 1}
+                      selected={selection?.player === 1 && selection?.index === index}
+                      onClick={() => {
+                        if (!isLocal) return;
+                        if (game.turn !== 1) return;
+                        const options = dominoMovesForTile(tile, chainOpen);
+                        if (options.length === 0) return;
+                        if (options.length === 1) setPlayerMove(index);
+                        else setSelection({ index, player: 1 });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {game.roundResult !== null || !isTurnActive || game.over ? null : (
+              <>
+                {movesForCurrent.length === 0 && canDraw ? <Button onClick={() => drawForPlayer(game.turn)}>Comprar peça</Button> : null}
+                {movesForCurrent.length === 0 && !canDraw ? <Button onClick={() => tryPass(game.turn)}>Passar</Button> : null}
+              </>
+            )}
+          </div>
+        </CardViewport>
+      </CardTable>
+    </GameFrame>
+  );
 }
 
 function MahjongSolitaire(props: ExpandedGameProps) {
@@ -1532,9 +2060,9 @@ function CardTable({
   className?: string;
 }) {
   const style = {
-    "--card-w": spider ? "clamp(3rem, 8.5vw, 4.95rem)" : compact ? "clamp(3.65rem, 10.5vw, 5.8rem)" : "clamp(4.1rem, 11vw, 6.7rem)",
+    "--card-w": spider ? "clamp(2.35rem, 8vw, 3.8rem)" : compact ? "clamp(2.55rem, 10vw, 4.8rem)" : "clamp(2.75rem, 11vw, 5.8rem)",
     "--fan-y": spider ? "clamp(1.05rem, 3.25vw, 1.75rem)" : compact ? "clamp(1.25rem, 3.8vw, 2.05rem)" : "clamp(1.55rem, 4.2vw, 2.55rem)",
-    "--card-gap": spider ? "0.32rem" : "clamp(0.45rem, 1.2vw, 0.8rem)",
+    "--card-gap": spider ? "0.3rem" : "clamp(0.32rem, 1vw, 0.65rem)",
   } as CSSProperties;
   return (
     <div
@@ -1559,10 +2087,12 @@ function CardViewport({
   className?: string;
 }) {
   const style = {
-    minWidth: `calc((var(--card-w) * ${columns}) + (var(--card-gap) * ${Math.max(0, columns - 1)}))`,
+    "--card-w": `min(var(--card-w), calc((100% - (var(--card-gap) * ${Math.max(1, columns - 1)})) / ${columns})`,
+    gridTemplateColumns: `repeat(${columns}, minmax(0, var(--card-w)))`,
+    width: "100%",
   } as CSSProperties;
   return (
-    <div className="overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:thin]">
+    <div className="overflow-x-hidden overflow-y-visible pb-2">
       <div className={cx("grid gap-3", className)} style={style}>
         {children}
       </div>
@@ -1612,7 +2142,9 @@ function CardView({
     if (!draggable) return;
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", label);
-    event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, event.currentTarget.offsetHeight / 2);
+    const ghost = new Image();
+    ghost.src = DRAG_GHOST_IMAGE;
+    event.dataTransfer.setDragImage(ghost, 0, 0);
     window.requestAnimationFrame(() => {
       event.currentTarget.style.opacity = "0";
     });

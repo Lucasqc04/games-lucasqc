@@ -220,7 +220,7 @@ function Status({ children }: { children: React.ReactNode }) {
 
 function ScoreRow({ items }: { items: Array<{ label: string; value: React.ReactNode }> }) {
   return (
-    <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin] sm:flex-wrap sm:justify-center">
+    <div className="mb-2 flex w-full flex-wrap gap-1.5 sm:justify-center">
       {items.map((item) => (
         <div key={item.label} className="min-w-[6.5rem] rounded-md border border-slate-200 bg-slate-950/[0.04] px-2.5 py-1.5 dark:border-white/10 dark:bg-white/5">
           <span className="block text-[0.65rem] font-bold uppercase leading-none text-slate-600 dark:text-slate-500">{item.label}</span>
@@ -233,7 +233,7 @@ function ScoreRow({ items }: { items: Array<{ label: string; value: React.ReactN
 
 function CompactScoreRow({ items }: { items: Array<{ label: string; value: React.ReactNode }> }) {
   return (
-    <div className="flex w-full items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin] sm:flex-wrap sm:justify-center">
+    <div className="flex w-full flex-wrap gap-1.5 sm:justify-center">
       {items.map((item) => (
         <div key={item.label} className="min-w-[5.25rem] rounded-md border border-slate-200 bg-slate-950/[0.04] px-2.5 py-1.5 dark:border-white/10 dark:bg-white/5">
           <span className="block text-[0.65rem] font-black uppercase leading-none text-slate-600 dark:text-slate-500">{item.label}</span>
@@ -586,13 +586,13 @@ function Minesweeper({ record, stats, sound }: GameComponentProps) {
         ]}
       />
       <Status>{ended === "win" ? "Você venceu." : ended === "loss" ? "Fim de jogo." : "Revele casas seguras."}</Status>
-      <div className="overflow-auto pb-2">
+      <div className="overflow-x-hidden overflow-y-auto pb-2">
         <div
-          className="mx-auto grid w-max gap-1"
+          className="mx-auto grid w-full gap-1"
           style={
             {
-              "--mine-cell": `min(3rem, calc((100vw - 2rem) / ${config.w}), calc((100svh - 19rem) / ${config.h}))`,
-              gridTemplateColumns: `repeat(${config.w}, minmax(max(2.1rem, var(--mine-cell)), max(2.1rem, var(--mine-cell))))`,
+              "--mine-cell": `clamp(1.85rem, min((100vw - 2rem) / ${config.w}, 2.8rem), calc((100svh - 19rem) / ${config.h}))`,
+              gridTemplateColumns: `repeat(${config.w}, minmax(1.7rem, var(--mine-cell)))`,
             } as React.CSSProperties
           }
         >
@@ -638,43 +638,329 @@ function Minesweeper({ record, stats, sound }: GameComponentProps) {
 }
 
 // 4. Forca
-const wordBank: Record<string, Array<{ word: string; hint: string }>> = {
-  Animais: [
+type HangmanWord = { word: string; hint: string };
+
+const hangmanDifficultyChoices: Choice<Difficulty>[] = [
+  { value: "easy", label: "Fácil (mais tempo)" },
+  { value: "medium", label: "Médio" },
+  { value: "hard", label: "Difícil (menos erros)" },
+];
+
+const hangmanWordBank: Record<string, HangmanWord[]> = {
+  ANIMAIS: [
     { word: "CACHORRO", hint: "Companheiro doméstico" },
+    { word: "GATO", hint: "Animal felino" },
+    { word: "ELEFANTE", hint: "Gigante cinza com tromba" },
+    { word: "LEOPARDO", hint: "Felino com pintas douradas" },
+    { word: "CANGURU", hint: "Pula e tem bolsa na barriga" },
+    { word: "ORCA", hint: "Predador marinho preto e branco" },
+    { word: "PINGUIM", hint: "Ave que não voa" },
+    { word: "ARRAIA", hint: "Planador de oceano" },
+    { word: "RINOCERONTE", hint: "Tem um chifre no focinho" },
+    { word: "HIPOPOTAMO", hint: "Grande roedor que não nada bem" },
+    { word: "GIRAFA", hint: "Animal de pescoço mais alto" },
+    { word: "AVESTRUZ", hint: "Ave que não voa" },
+    { word: "FALCAO", hint: "Ave de caça com visão apurada" },
+    { word: "COBRA", hint: "Réptil sem pernas" },
+    { word: "LAGARTO", hint: "Réptil que muda de cor em algumas espécies" },
+    { word: "TUBARAO", hint: "Nadador de cartilagem" },
+    { word: "PANDA", hint: "Roedor de bambu e preto e branco" },
+    { word: "GAZELA", hint: "Vive em savanas e corre rápido" },
+    { word: "LEAO", hint: "Rei da selva" },
+    { word: "MACACO", hint: "Primata que usa as mãos com destreza" },
+    { word: "BESOURO", hint: "Inseto que vira borboleta" },
     { word: "TARTARUGA", hint: "Carapaça e vida longa" },
     { word: "BORBOLETA", hint: "Passa por metamorfose" },
   ],
-  Jogos: [
-    { word: "XADREZ", hint: "Reis, rainhas e xeque" },
+  CULINARIA: [
+    { word: "MACARRAO", hint: "Massa curta ou longa" },
+    { word: "PIZZA", hint: "Disco de massa com cobertura" },
+    { word: "SUSHI", hint: "Prato de arroz envolvido" },
+    { word: "HAMBURGUER", hint: "Pão, carne e muito recheio" },
+    { word: "SOPA", hint: "Prato líquido no prato" },
+    { word: "CANJI", hint: "Bebida de cana fermentada" },
+    { word: "FEIJOADA", hint: "Prato típico brasileiro com feijão preto" },
+    { word: "LASANHA", hint: "Camadas de massa e queijo" },
+    { word: "SORVETE", hint: "Gelado doce servido em casquinha ou pote" },
+    { word: "BOLO", hint: "Massa doce para festas" },
+    { word: "TAPIOCA", hint: "Base da tapioca" },
+    { word: "CARBONARA", hint: "Molho italiano com ovos e queijo" },
+    { word: "CUPCAKE", hint: "Bolo individual com cobertura" },
+    { word: "EMPANADA", hint: "Torta assada com recheio" },
+    { word: "MOCHA", hint: "Bebida quente com chocolate" },
+    { word: "SALADA", hint: "Mistura de folhas e legumes" },
+    { word: "SOBREMESA", hint: "Fim de refeição doce" },
+    { word: "PANQUECA", hint: "Massa fina frita na frigideira" },
+    { word: "CAPUCHINO", hint: "Café italiano com leite espumado" },
+    { word: "PIPOCA", hint: "Estoura com milho" },
+    { word: "CANELA", hint: "Especiaria aromática" },
+  ],
+  CIDADES: [
+    { word: "SAOPAULO", hint: "Maior cidade da América do Sul" },
+    { word: "RIODEJANEIRO", hint: "Cidade maravilhosa" },
+    { word: "BRASILIA", hint: "Capital federal" },
+    { word: "LISBOA", hint: "Capital de Portugal" },
+    { word: "MADRID", hint: "Capital da Espanha" },
+    { word: "PARIS", hint: "Cidade luz" },
+    { word: "ROMA", hint: "Cidade do coliseu" },
+    { word: "LONDRES", hint: "Cidade do Big Ben" },
+    { word: "BERLIM", hint: "Capital da Alemanha" },
+    { word: "TOKYO", hint: "Metrópole do Japão" },
+    { word: "SIDNEY", hint: "Cidade com Opera House" },
+    { word: "SANTIAGO", hint: "Capital da Argentina" },
+    { word: "LIMA", hint: "Capital peruana" },
+    { word: "MONTEVIDEO", hint: "Capital do Uruguai" },
+    { word: "MACEIO", hint: "Capital do estado de Alagoas" },
+    { word: "RECIFE", hint: "Cidade do frevo" },
+    { word: "SANTACRUZ", hint: "Metrópole litorânea mineira" },
+    { word: "BELOHORIZONTE", hint: "Cidade em Minas" },
+    { word: "PORTOALEGRE", hint: "Cidade das pontes e mangues" },
+    { word: "FORTALEZA", hint: "Capital do Ceará" },
+  ],
+  FILMES: [
+    { word: "INCEPTION", hint: "Filme de sonho dentro de sonho" },
+    { word: "TITANIC", hint: "Barco gigante de romance e tragédia" },
+    { word: "JURASSIC", hint: "Dinossauros e parque temático" },
+    { word: "MATRIX", hint: "Realidade simulada" },
+    { word: "AVATAR", hint: "Aldea azul e Na'vi" },
+    { word: "INTERESTELAR", hint: "Viagem interestelar com buracos negros" },
+    { word: "CINDERELLA", hint: "Conto de fadas com sapatinho" },
+    { word: "GLADIADOR", hint: "Épico romano de vingança" },
+    { word: "DUNKIRK", hint: "Filme de guerra e sobrevivência" },
+    { word: "TOPGUN", hint: "Aviadores e combate aéreo" },
+    { word: "ELVIS", hint: "Biografia de cantor lendário no cinema" },
+    { word: "HOMEMARANHA", hint: "Herói com sentido aranha" },
+    { word: "MULAN", hint: "Lenda chinesa em animação" },
+    { word: "MOANA", hint: "Aventura no oceano" },
+    { word: "LOGAN", hint: "Filme que também virou nome de mutante" },
+    { word: "VINGADORES", hint: "Equipe de heróis no cinema" },
+    { word: "WOLVERINE", hint: "Mutante com garras" },
+    { word: "PANICO", hint: "Nome de filme terror e comédia" },
+    { word: "JUMANJI", hint: "Jogo vira filme de aventura" },
+    { word: "FROZEN", hint: "Princesa de gelo" },
+  ],
+  MUSICA: [
+    { word: "BASSET", hint: "Estilo de jazz com improviso" },
+    { word: "POP", hint: "Gênero de alcance mundial" },
+    { word: "ROCK", hint: "Guitarra, bateria e energia" },
+    { word: "SAMBA", hint: "Ritmo brasileiro" },
+    { word: "FORRO", hint: "Música típica do nordeste" },
+    { word: "AXE", hint: "Gênero com origem no jazz" },
+    { word: "SERTANEJO", hint: "Canção popular do interior" },
+    { word: "BREGOURO", hint: "Ritmo clássico brasileiro" },
+    { word: "BANDA", hint: "Grupo de músicos" },
+    { word: "INSTRUMENTO", hint: "Ferramenta que faz som" },
+    { word: "GUITARRA", hint: "Cordas e palhetada" },
+    { word: "PIANO", hint: "Instrumento de teclas clássico" },
+    { word: "BATERIA", hint: "Marca o ritmo da canção" },
+    { word: "CANTOR", hint: "Quem interpreta a música" },
+    { word: "CONCERTO", hint: "Show ao vivo" },
+    { word: "MICROFONE", hint: "Amplifica a voz" },
+    { word: "REFRAO", hint: "Parte repetida da música" },
+    { word: "CORO", hint: "Vozes em conjunto" },
+    { word: "DISCO", hint: "Álbum antigo em formato redondo" },
+    { word: "LETRA", hint: "Texto da música" },
+  ],
+  ESPORTES: [
+    { word: "FUTEBOL", hint: "Esporte mais popular do mundo" },
+    { word: "BASQUETE", hint: "Bolinha cai em cesta" },
+    { word: "VOLEI", hint: "Jogo de rede e toques" },
+    { word: "NATACAO", hint: "Modalidade na água" },
+    { word: "ATLETISMO", hint: "Corridas e saltos" },
+    { word: "CICLISMO", hint: "Pedalar em competição" },
+    { word: "BOXE", hint: "Luta com socos" },
+    { word: "TENIS", hint: "Raquete e quadra" },
+    { word: "GOLFE", hint: "Jogo de precisão no campo" },
+    { word: "FUTSAL", hint: "Futebol em quadra" },
+    { word: "HANDBOL", hint: "Esporte de handebol" },
+    { word: "HANDBALL", hint: "Semântico parecido com handebol" },
+    { word: "MARATONA", hint: "Corrida de longa distância" },
+    { word: "SKATE", hint: "Prancha com rodas" },
+    { word: "SURFE", hint: "Montar ondas no mar" },
+    { word: "GINASTICA", hint: "Rotinas corporais e aparelhos" },
+    { word: "ESGRIMA", hint: "Luta com lâmina" },
+    { word: "FISICA", hint: "Esporte de precisão e velocidade" },
+    { word: "RUGBY", hint: "Esporte de contato com bola oval" },
+    { word: "BASEBALL", hint: "Esporte com taco e bola" },
+  ],
+  TECNOLOGIA: [
+    { word: "COMPUTADOR", hint: "Máquina de processamento" },
+    { word: "PROGRAMACAO", hint: "Escrever código" },
+    { word: "ALGORITMO", hint: "Conjunto de passos lógicos" },
+    { word: "INTELIGENCIA", hint: "Capacidade de máquina em simular decisão" },
+    { word: "ROBOTICA", hint: "Máquinas automáticas e programação" },
+    { word: "REDES", hint: "Conjunto de conexões" },
+    { word: "SEGURANCA", hint: "Proteção de dados" },
+    { word: "NUVEM", hint: "Armazenamento remoto" },
+    { word: "BANCODEDADOS", hint: "Armazena registros estruturados" },
+    { word: "FIREWALL", hint: "Barreira de proteção de rede" },
+    { word: "HARDWARE", hint: "Parte física de um sistema" },
+    { word: "SOFTWARE", hint: "Parte lógica de um sistema" },
+    { word: "INTERNET", hint: "Rede global de comunicação" },
+    { word: "TELEFONE", hint: "Comunicação por voz e mensagem" },
+    { word: "DESKTOP", hint: "Computador de mesa" },
+    { word: "JAVASCRIPT", hint: "Linguagem da web" },
+    { word: "PYTHON", hint: "Linguagem com nome de serpente" },
+    { word: "REACT", hint: "Biblioteca de UI famosa" },
+    { word: "FRONTEND", hint: "Interface do usuário" },
+    { word: "BACKEND", hint: "Servidor e regras de negócio" },
+  ],
+  HISTORIA: [
+    { word: "ROMA", hint: "Império antigo de muitos séculos" },
+    { word: "EGITO", hint: "Civilização das pirâmides" },
+    { word: "GRECIA", hint: "Origem da democracia clássica" },
+    { word: "CARAVELA", hint: "Navegação da expansão marítima" },
+    { word: "REVOLUCAO", hint: "Mudança brusca de regime" },
+    { word: "INDEPENDENCIA", hint: "Quebra de domínio colonial" },
+    { word: "IMPERIO", hint: "Poder territorial amplo" },
+    { word: "CONQUISTADOR", hint: "Explorador histórico" },
+    { word: "NAVEGACAO", hint: "Travessias em mar aberto" },
+    { word: "CIDADANIA", hint: "Conjunto de direitos" },
+    { word: "DEMOCRACIA", hint: "Regime com voto popular" },
+    { word: "REPUBLICA", hint: "Forma de governo representativa" },
+    { word: "CONSTITUICAO", hint: "Carta magna de um país" },
+    { word: "GUERRA", hint: "Conflito armado" },
+    { word: "PAZ", hint: "Ausência de guerra" },
+    { word: "ARMADA", hint: "Forca naval de um país" },
+    { word: "HISTORIADOR", hint: "Quem estuda eventos" },
+    { word: "ARQUEOLOGIA", hint: "Escavação e descoberta do passado" },
+    { word: "TEMPLO", hint: "Lugar religioso antigo" },
+    { word: "MONUMENTO", hint: "Estrutura histórica preservada" },
+  ],
+  GEOGRAFIA: [
+    { word: "MONTANHA", hint: "Elevação natural do relevo" },
+    { word: "DESERTO", hint: "Região de pouca chuva" },
+    { word: "RIO", hint: "Curso de água natural" },
+    { word: "OCEANO", hint: "Maior massa de água da Terra" },
+    { word: "MATA", hint: "Floresta densa" },
+    { word: "LITORAL", hint: "Faixa junto ao mar" },
+    { word: "SAHARA", hint: "Maior deserto do mundo" },
+    { word: "AMAZONIA", hint: "Maior bacia hidrográfica" },
+    { word: "CERRADO", hint: "Bioma brasileiro de savana" },
+    { word: "MATAATLANTICA", hint: "Bioma costeiro brasileiro" },
+    { word: "TUNDRA", hint: "Bioma frio e seco" },
+    { word: "GELO", hint: "Estado sólido da água no frio" },
+    { word: "ARCOIRIS", hint: "Fenômeno após chuva e sol" },
+    { word: "ERUPCAO", hint: "Explosão vulcânica" },
+    { word: "PLATEIA", hint: "Parte baixa da crosta" },
+    { word: "VULCANO", hint: "Montanha com lava" },
+    { word: "ISLANDIA", hint: "País famoso por geleiras" },
+    { word: "ANDES", hint: "Maior cadeia montanhosa da America do Sul" },
+    { word: "PLANICIE", hint: "Terreno com relevo plano e alto" },
+    { word: "ARCADIA", hint: "Nome histórico e geográfico pouco usado" },
+  ],
+  GAMES: [
+    { word: "XADREZ", hint: "Reis, rainhas e xeque-mate" },
     { word: "SUDOKU", hint: "Números em grade" },
     { word: "PONG", hint: "Arcade com raquetes" },
+    { word: "PACMAN", hint: "Labirinto e fantasmas" },
+    { word: "GALAXY", hint: "Jogo de naves espaciais" },
+    { word: "MINECRAFT", hint: "Construção em blocos" },
+    { word: "FORTNITE", hint: "Battle royale famoso" },
+    { word: "VALORANT", hint: "FPS tático 5x5" },
+    { word: "LOL", hint: "Jogo de batalha online" },
+    { word: "MARIO", hint: "Plataforma e canos verdes" },
+    { word: "TETRIS", hint: "Caixas que giram e somem" },
+    { word: "COUNTERSTRIKE", hint: "Nome de um clássico FPS" },
+    { word: "DOTA", hint: "MOBA de 5 jogadores" },
+    { word: "STARDUST", hint: "Nome de jogo de fantasia" },
+    { word: "SHINRA", hint: "Título curto com samurai" },
+    { word: "LUDO", hint: "Tabuleiro clássico de corrida" },
+    { word: "MONOPOLIO", hint: "Economia e propriedades" },
+    { word: "UNO", hint: "Cartas coloridas com números" },
+    { word: "BLOODBORNE", hint: "Aventura sombria em fantasia" },
+    { word: "BATTLEFIELD", hint: "Guerra em primeira pessoa" },
   ],
-  Brasil: [
-    { word: "BRASILIA", hint: "Capital federal" },
-    { word: "AMAZONIA", hint: "Maior floresta tropical" },
-    { word: "SAMBA", hint: "Ritmo brasileiro" },
+  VERBOS: [
+    { word: "COMER", hint: "Ação de levar comida à boca" },
+    { word: "CORRER", hint: "Mover-se rápido com velocidade" },
+    { word: "PENSAR", hint: "Processo mental ativo" },
+    { word: "LER", hint: "Decodificar letras" },
+    { word: "ESCREVER", hint: "Transformar ideia em texto" },
+    { word: "SOMAR", hint: "Juntar quantidades" },
+    { word: "SONHAR", hint: "Ter imagens ao dormir" },
+    { word: "NADAR", hint: "Mover-se na água" },
+    { word: "VOAR", hint: "Mover-se pelo céu" },
+    { word: "DESCANSAR", hint: "Pausar e recuperar energia" },
+    { word: "OBSERVAR", hint: "Ver com atenção" },
+    { word: "ENSINAR", hint: "Transmitir conhecimento" },
+    { word: "APRENDER", hint: "Adquirir novo saber" },
+    { word: "CRIAR", hint: "Fazer algo pela primeira vez" },
+    { word: "JULGAR", hint: "Avaliar com critério" },
+    { word: "MEDITAR", hint: "Concentrar a mente" },
+    { word: "ATENDER", hint: "Responder ou servir alguém" },
+    { word: "GUIAR", hint: "Conduzir no caminho" },
+    { word: "AGUARDAR", hint: "Esperar com calma" },
+    { word: "LIVRAR", hint: "Não perder o controle" },
   ],
 };
+
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const hangmanCategoryKeys = Object.keys(hangmanWordBank);
+const hangmanDifficultyMaxErrors: Record<Difficulty, number> = {
+  easy: 9,
+  medium: 7,
+  hard: 5,
+};
+const hangmanMaxVisualStage = 6;
+
+function normalizeForSearch(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function getWordsByDifficulty(entries: HangmanWord[], difficulty: Difficulty) {
+  const normalized = difficulty === "easy" ? (word: HangmanWord) => word.word.length <= 6 : difficulty === "medium" ? (word: HangmanWord) => word.word.length <= 8 : (word: HangmanWord) => word.word.length >= 9;
+  const filtered = entries.filter(normalized);
+  return filtered.length ? filtered : entries;
+}
+
+function pickRandomHangmanWord(category: string, difficulty: Difficulty) {
+  return randomItem(getWordsByDifficulty(hangmanWordBank[category], difficulty));
+}
 
 function Hangman({ record, sound }: GameComponentProps) {
   const [mode, setMode] = useState<PlayMode>("solo");
-  const [category, setCategory] = useState("Animais");
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [category, setCategory] = useState(hangmanCategoryKeys[0]);
+  const [categoryQuery, setCategoryQuery] = useState("");
   const [secretInput, setSecretInput] = useState("");
-  const [entry, setEntry] = useState(() => randomItem(wordBank.Animais));
+  const [entry, setEntry] = useState(() => pickRandomHangmanWord(hangmanCategoryKeys[0], "medium"));
   const [guesses, setGuesses] = useState<string[]>([]);
   const [ended, setEnded] = useState(false);
-  const maxErrors = 6;
+  const maxErrors = hangmanDifficultyMaxErrors[difficulty];
+  const filteredCategories = hangmanCategoryKeys.filter((item) => {
+    const normalized = normalizeForSearch(item);
+    const query = normalizeForSearch(categoryQuery);
+    return !query || normalized.includes(query);
+  });
+  const showCategories = filteredCategories;
   const errors = guesses.filter((letter) => !entry.word.includes(letter)).length;
   const won = entry.word.split("").every((letter) => guesses.includes(letter));
   const lost = errors >= maxErrors;
 
-  function reset(nextMode = mode) {
+  function reset(nextMode = mode, nextDifficulty = difficulty, nextCategory = category) {
     setMode(nextMode);
+    setDifficulty(nextDifficulty);
+    setCategory(nextCategory);
     setGuesses([]);
     setEnded(false);
     setSecretInput("");
-    if (nextMode === "solo") setEntry(randomItem(wordBank[category]));
+    if (nextMode === "solo") setEntry(pickRandomHangmanWord(nextCategory, nextDifficulty));
+    else setEntry({ word: "", hint: "Palavra definida pelo outro jogador" });
+  }
+
+  function pickCategory(nextCategory: string) {
+    if (!hangmanWordBank[nextCategory]) return;
+    setCategory(nextCategory);
+    setCategoryQuery("");
+    setGuesses([]);
+    setEnded(false);
+    setSecretInput("");
+    if (mode === "solo") setEntry(pickRandomHangmanWord(nextCategory, difficulty));
     else setEntry({ word: "", hint: "Palavra definida pelo outro jogador" });
   }
 
@@ -696,20 +982,41 @@ function Hangman({ record, sound }: GameComponentProps) {
   });
 
   return (
-    <div>
+    <div className="mx-auto flex w-full max-w-2xl flex-col">
       <Controls>
         <Select label="Modo" value={mode} options={soloLocalModes} onChange={(value) => reset(value)} />
-        <Select
-          label="Categoria"
-          value={category}
-          options={Object.keys(wordBank).map((item) => ({ value: item, label: item }))}
-          onChange={(value) => {
-            setCategory(value);
-            setEntry(randomItem(wordBank[value]));
-            setGuesses([]);
-            setEnded(false);
-          }}
-        />
+        <Select label="Dificuldade" value={difficulty} options={hangmanDifficultyChoices} onChange={(value) => reset(mode, value)} />
+        <div className="min-w-52">
+          <label className="mb-1 flex min-w-32 flex-col gap-0.5 text-[0.68rem] font-black uppercase leading-tight text-slate-600 dark:text-slate-400">
+            Buscar tema
+            <input
+              value={categoryQuery}
+              onChange={(event) => setCategoryQuery(event.target.value)}
+              placeholder="Digite parte do tema..."
+              className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-950 shadow-sm dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-100"
+            />
+          </label>
+          <div className="mt-1 max-h-32 grid grid-cols-1 gap-1 overflow-y-auto rounded border border-slate-300 bg-white p-1 text-sm dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-100">
+            {showCategories.slice(0, 12).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => pickCategory(item)}
+                className={cn(
+                  "flex items-center justify-between rounded px-2 py-1 text-left text-sm font-black uppercase",
+                  item === category ? "bg-brand-500 text-black" : "hover:bg-brand-50 dark:hover:bg-white/10",
+                )}
+              >
+                <span>{item}</span>
+                <span className="text-[0.67rem] font-normal text-slate-500 dark:text-slate-300">
+                  {hangmanWordBank[item].length} palavras
+                </span>
+              </button>
+            ))}
+            {showCategories.length === 0 ? <p className="px-2 py-2 text-xs text-slate-500">Nenhum tema encontrado.</p> : null}
+            {showCategories.length > 12 ? <p className="px-2 py-2 text-xs text-slate-500">Use busca para reduzir os temas.</p> : null}
+          </div>
+        </div>
         <Button tone="primary" onClick={() => reset()}>
           Reiniciar
         </Button>
@@ -721,6 +1028,8 @@ function Hangman({ record, sound }: GameComponentProps) {
             event.preventDefault();
             const cleaned = secretInput.toUpperCase().replace(/[^A-Z]/g, "");
             if (cleaned) setEntry({ word: cleaned, hint: "Palavra secreta local" });
+            setEnded(false);
+            setGuesses([]);
           }}
         >
           <input
@@ -738,6 +1047,8 @@ function Hangman({ record, sound }: GameComponentProps) {
       <ScoreRow
         items={[
           { label: "Erros", value: `${errors}/${maxErrors}` },
+          { label: "Tema", value: category },
+          { label: "Dificuldade", value: difficulty === "easy" ? "Fácil" : difficulty === "medium" ? "Médio" : "Difícil" },
           {
             label: "Dica",
             value: (
@@ -750,8 +1061,12 @@ function Hangman({ record, sound }: GameComponentProps) {
           { label: "Status", value: won ? "Vitória" : lost ? "Derrota" : "Em jogo" },
         ]}
       />
-      <div className="mx-auto mb-4 grid w-[min(72vw,18rem)] place-items-center rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
-        <Sprite game="hangman" name={lost ? "stage-lost" : `stage-${Math.min(errors, maxErrors)}`} className="h-44 w-full" />
+      <div className="mx-auto mb-4 grid w-full max-w-[18rem] place-items-center rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+        <Sprite
+          game="hangman"
+          name={lost ? "stage-lost" : `stage-${Math.min(errors, maxErrors, hangmanMaxVisualStage)}`}
+          className="h-44 w-full"
+        />
       </div>
       <div className="mb-4 flex flex-wrap justify-center gap-2">
         {entry.word
@@ -2471,46 +2786,62 @@ type Board2048 = number[][];
 type Tile2048 = { id: number; value: number; x: number; y: number; merged?: boolean; fresh?: boolean };
 type Direction2048 = "left" | "right" | "up" | "down";
 
-function empty2048(): Board2048 {
-  return range(4).map(() => range(4).map(() => 0));
+type BoardSize2048 = number;
+
+const MIN_2048_BOARD_SIZE = 3;
+const MAX_2048_BOARD_SIZE = 20;
+const DEFAULT_2048_BOARD_SIZE = 4;
+const TILE_MOVE_DURATION_MS = 190;
+const TILE_SPAWN_DURATION_MS = 175;
+
+const tileSizeOptions2048 = range(MAX_2048_BOARD_SIZE - MIN_2048_BOARD_SIZE + 1).map((index) => {
+  const size = MIN_2048_BOARD_SIZE + index;
+  return {
+    value: size.toString(),
+    label: `${size} x ${size}`,
+  };
+});
+
+function empty2048(size: BoardSize2048): Board2048 {
+  return range(size).map(() => range(size).map(() => 0));
 }
 
-function boardFromTiles2048(tiles: Tile2048[]): Board2048 {
-  const board = empty2048();
+function boardFromTiles2048(tiles: Tile2048[], size: BoardSize2048): Board2048 {
+  const board = empty2048(size);
   tiles.forEach((tile) => {
     board[tile.y][tile.x] = tile.value;
   });
   return board;
 }
 
-function addTile2048(tiles: Tile2048[], nextId: () => number, fresh = true) {
+function addTile2048(tiles: Tile2048[], nextId: () => number, size: BoardSize2048, fresh = true) {
   const used = new Set(tiles.map((tile) => `${tile.x},${tile.y}`));
-  const empty = range(4).flatMap((y) => range(4).map((x) => (used.has(`${x},${y}`) ? null : { x, y }))).filter(Boolean) as Array<{ x: number; y: number }>;
+  const empty = range(size).flatMap((y) => range(size).map((x) => (used.has(`${x},${y}`) ? null : { x, y }))).filter(Boolean) as Array<{ x: number; y: number }>;
   if (!empty.length) return tiles;
   const cell = randomItem(empty);
   return [...tiles, { id: nextId(), value: Math.random() > 0.9 ? 4 : 2, x: cell.x, y: cell.y, fresh }];
 }
 
-function start2048(nextId: () => number) {
-  return addTile2048(addTile2048([], nextId), nextId);
+function start2048(nextId: () => number, size: BoardSize2048) {
+  return addTile2048(addTile2048([], nextId, size, true), nextId, size, true);
 }
 
-function lineCells2048(dir: Direction2048, line: number) {
-  if (dir === "left") return range(4).map((x) => ({ x, y: line }));
-  if (dir === "right") return range(4).map((offset) => ({ x: 3 - offset, y: line }));
-  if (dir === "up") return range(4).map((y) => ({ x: line, y }));
-  return range(4).map((offset) => ({ x: line, y: 3 - offset }));
+function lineCells2048(dir: Direction2048, size: BoardSize2048, line: number) {
+  if (dir === "left") return range(size).map((x) => ({ x, y: line }));
+  if (dir === "right") return range(size).map((offset) => ({ x: size - 1 - offset, y: line }));
+  if (dir === "up") return range(size).map((y) => ({ x: line, y }));
+  return range(size).map((offset) => ({ x: line, y: size - 1 - offset }));
 }
 
-function planMove2048(tiles: Tile2048[], dir: Direction2048) {
+function planMove2048(tiles: Tile2048[], dir: Direction2048, size: BoardSize2048) {
   const tileAt = new Map(tiles.map((tile) => [`${tile.x},${tile.y}`, tile]));
   const moving: Tile2048[] = [];
   const finalTiles: Tile2048[] = [];
   let score = 0;
   let changed = false;
 
-  for (let line = 0; line < 4; line += 1) {
-    const cells = lineCells2048(dir, line);
+  for (let line = 0; line < size; line += 1) {
+    const cells = lineCells2048(dir, size, line);
     const lineTiles = cells.map((cell) => tileAt.get(`${cell.x},${cell.y}`)).filter(Boolean) as Tile2048[];
     let targetIndex = 0;
     for (let i = 0; i < lineTiles.length; i += 1) {
@@ -2536,25 +2867,56 @@ function planMove2048(tiles: Tile2048[], dir: Direction2048) {
   return { moving, finalTiles, score, changed };
 }
 
-function canMove2048(board: Board2048) {
+function canMove2048(board: Board2048, size: BoardSize2048) {
   if (board.flat().some((cell) => cell === 0)) return true;
-  return range(4).some((y) =>
-    range(4).some((x) => {
+  return range(size).some((y) =>
+    range(size).some((x) => {
       const value = board[y][x];
-      return board[y][x + 1] === value || board[y + 1]?.[x] === value;
+      return board[y]?.[x + 1] === value || board[y + 1]?.[x] === value;
     }),
   );
 }
 
 const tileAssets2048 = new Set([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]);
 
+function getTilePalette2048(value: number) {
+  const exponent = Math.max(1, Math.log2(value));
+  const hue = (exponent * 26) % 360;
+  const light = Math.max(22, 74 - exponent * 1.58);
+  const bg = `linear-gradient(145deg, hsl(${hsl(hue, 74, light + 8)}), hsl(${hsl(hue, 82, Math.max(28, light - 2)}))`;
+  return { background: bg, text: light < 40 ? "#f8fafc" : "#0f172a" };
+}
+
+function hsl(hue: number, saturation: number, lightness: number) {
+  return `${hue} ${Math.round(saturation)}% ${Math.round(lightness)}%`;
+}
+
+function getTileFontSize2048(value: number, boardSize: BoardSize2048) {
+  const exponent = Math.log10(value);
+  const dynamic = 1.75 - exponent * 0.1 - (boardSize - 4) * 0.02;
+  return `${Math.max(0.72, Math.min(1.9, dynamic))}rem`;
+}
+
+function getTileStyle2048(value: number, boardSize: BoardSize2048): React.CSSProperties {
+  const palette = getTilePalette2048(value);
+  return {
+    background: value === 2 || value === 4 ? "linear-gradient(155deg, #f7f7f4, #f0f0ea)" : palette.background,
+    color: palette.text,
+    fontSize: getTileFontSize2048(value, boardSize),
+    boxShadow: `inset 0 0 0 1px rgba(0, 0, 0, 0.06), 0 14px 30px rgba(0, 0, 0, 0.16)`,
+  };
+}
+
 function Game2048({ record, stats, sound }: GameComponentProps) {
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const tileIdRef = useRef(1);
   const animationRef = useRef<number | null>(null);
   const animatingRef = useRef(false);
+  const boardSizeRef = useRef(DEFAULT_2048_BOARD_SIZE);
   const nextTileId = () => tileIdRef.current++;
-  const [tiles, setTiles] = useState<Tile2048[]>(() => start2048(nextTileId));
+  const [boardSizeValue, setBoardSizeValue] = useState(DEFAULT_2048_BOARD_SIZE.toString());
+  const boardSize = Number(boardSizeValue);
+  const [tiles, setTiles] = useState<Tile2048[]>(() => start2048(nextTileId, DEFAULT_2048_BOARD_SIZE));
   const [score, setScore] = useState(0);
   const [ended, setEnded] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>("all");
@@ -2563,29 +2925,42 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
     if (animationRef.current) window.clearTimeout(animationRef.current);
     tileIdRef.current = 1;
     animatingRef.current = false;
-    setTiles(start2048(nextTileId));
+    setTiles(start2048(nextTileId, boardSizeRef.current));
     setScore(0);
     setEnded(false);
   }
 
+  function resizeBoard(nextSize: string) {
+    const next = Number(nextSize);
+    if (!Number.isInteger(next) || next < MIN_2048_BOARD_SIZE || next > MAX_2048_BOARD_SIZE) return;
+    boardSizeRef.current = next;
+    setBoardSizeValue(next.toString());
+    if (animationRef.current) window.clearTimeout(animationRef.current);
+    tileIdRef.current = 1;
+    animatingRef.current = false;
+    setEnded(false);
+    setScore(0);
+    setTiles(start2048(nextTileId, next));
+  }
+
   function move(dir: Direction2048) {
     if (ended || animatingRef.current) return;
-    const result = planMove2048(tiles, dir);
+    const result = planMove2048(tiles, dir, boardSize);
     if (!result.changed) return;
     const nextScore = score + result.score;
     animatingRef.current = true;
     setTiles(result.moving);
     setScore(nextScore);
     animationRef.current = window.setTimeout(() => {
-      const finalTiles = addTile2048(result.finalTiles, nextTileId);
-      const finalBoard = boardFromTiles2048(finalTiles);
+      const finalTiles = addTile2048(result.finalTiles, nextTileId, boardSize);
+      const finalBoard = boardFromTiles2048(finalTiles, boardSize);
       setTiles(finalTiles);
       animatingRef.current = false;
-      if (!canMove2048(finalBoard)) {
+      if (!canMove2048(finalBoard, boardSize)) {
         setEnded(true);
         finish(record, { winner: finalBoard.flat().some((cell) => cell >= 2048) ? "solo" : "machine", score: nextScore }, sound);
       }
-    }, 155);
+    }, TILE_MOVE_DURATION_MS);
   }
 
   function finishSwipe(point: { x: number; y: number }) {
@@ -2622,7 +2997,7 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
     if (!tiles.some((tile) => tile.fresh || tile.merged)) return undefined;
     const id = window.setTimeout(() => {
       setTiles((current) => current.map(({ fresh, merged, ...tile }) => tile));
-    }, 210);
+    }, Math.max(TILE_MOVE_DURATION_MS, TILE_SPAWN_DURATION_MS) + 18);
     return () => window.clearTimeout(id);
   }, [tiles]);
 
@@ -2632,12 +3007,18 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
     };
   }, []);
 
-  const board = boardFromTiles2048(tiles);
+  const board = boardFromTiles2048(tiles, boardSize);
   const max = Math.max(...board.flat());
+  const tileGap = boardSize >= 10 ? "0.35rem" : "0.5rem";
+  const tileSizeFormula = `calc((100% - (var(--tile-gap) * ${boardSize - 1})) / ${boardSize})`;
+  const tileCount = boardSize * boardSize;
+
+  boardSizeRef.current = boardSize;
 
   return (
     <div>
       <Controls>
+        <Select label="Tabuleiro" value={boardSizeValue} options={tileSizeOptions2048} onChange={resizeBoard} />
         <Select label="Controle" value={controlMode} options={controlChoices} onChange={setControlMode} />
         <Button tone="primary" onClick={reset}>
           Reiniciar
@@ -2660,7 +3041,13 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
       />
       <div
         className="game-board-panel relative mx-auto aspect-square w-[min(98vw,40rem)] touch-none overflow-hidden rounded-lg p-2.5 sm:p-3"
-        style={{ "--tile-gap": "0.5rem" } as React.CSSProperties}
+        style={
+          {
+            "--tile-gap": tileGap,
+            "--tile-size": tileSizeFormula,
+            "--tile-move-duration": `${TILE_MOVE_DURATION_MS}ms`,
+          } as React.CSSProperties
+        }
         onPointerDown={(event) => {
           if (controlEnabled(controlMode, "gestures")) dragStart.current = { x: event.clientX, y: event.clientY };
         }}
@@ -2669,8 +3056,8 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
           dragStart.current = null;
         }}
       >
-        <div className="grid h-full w-full grid-cols-4 gap-2">
-          {range(16).map((index) => (
+        <div className="grid h-full w-full" style={{ gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`, gap: tileGap }}>
+          {range(tileCount).map((index) => (
             <div key={index} className="game-cell aspect-square overflow-hidden rounded-md border border-slate-300 bg-slate-100 shadow-inner dark:border-slate-700 dark:bg-slate-900">
               <Sprite game="2048" name="tile-empty" className="h-full w-full opacity-70" />
             </div>
@@ -2679,21 +3066,22 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
         <div className="pointer-events-none absolute inset-2.5 sm:inset-3">
           {tiles.map((tile) => {
             const asset = tileAssets2048.has(tile.value) ? `tile-${tile.value}` : null;
+            const tileVisual = asset ? null : getTileStyle2048(tile.value, boardSize);
             const tileStyle = {
               "--tile-x": tile.x,
               "--tile-y": tile.y,
+              ...(tileVisual || {}),
             } as React.CSSProperties;
             return (
               <div
                 key={tile.id}
                 className={cn(
-                  "tile-2048 game-cell absolute left-0 top-0 overflow-hidden rounded-md border border-slate-300 bg-slate-100 text-2xl font-black text-slate-950 shadow-sm dark:border-slate-700 dark:bg-slate-900",
+                  "tile-2048 game-cell absolute left-0 top-0 overflow-hidden rounded-md border border-slate-300 text-center font-black shadow-sm dark:border-slate-700",
                   tile.fresh && "tile-2048-new",
-                  tile.merged && "tile-2048-merged",
                 )}
                 style={tileStyle}
               >
-                {asset ? <Sprite game="2048" name={asset} className="h-full w-full" /> : tile.value}
+                {asset ? <Sprite game="2048" name={asset} className="h-full w-full" /> : <span className="tile-2048-label" style={{ fontSize: tileVisual?.fontSize } as React.CSSProperties}>{tile.value}</span>}
               </div>
             );
           })}
@@ -3697,7 +4085,7 @@ function Sokoban({ record, sound }: GameComponentProps) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col items-center gap-1.5">
-      <div className="mx-auto flex w-full max-w-[88rem] flex-nowrap items-end justify-start gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin] sm:flex-wrap sm:justify-center sm:overflow-visible">
+      <div className="mx-auto flex w-full max-w-[88rem] flex-wrap items-end justify-start gap-1.5 px-1 pb-1 sm:justify-center">
         <Select
           label="Modo"
           value={levelMode}
