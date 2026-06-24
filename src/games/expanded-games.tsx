@@ -1520,7 +1520,9 @@ function CardView({
   hidden,
   selected,
   onClick,
+  onDoubleClick,
   draggable,
+  dragging,
   onDragStart,
   onDragEnd,
   className,
@@ -1531,7 +1533,9 @@ function CardView({
   hidden?: boolean;
   selected?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   draggable?: boolean;
+  dragging?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>) => void;
   onDragEnd?: (event: DragEvent<HTMLElement>) => void;
   className?: string;
@@ -1543,6 +1547,7 @@ function CardView({
     "block shrink-0 select-none rounded-[0.52rem] bg-contain bg-center bg-no-repeat drop-shadow-[0_0.34rem_0.42rem_rgba(15,23,42,0.25)] transition",
     onClick && "cursor-pointer hover:-translate-y-1 hover:drop-shadow-[0_0.55rem_0.75rem_rgba(15,23,42,0.32)]",
     draggable && "cursor-grab active:cursor-grabbing active:scale-[0.98]",
+    dragging && "opacity-0",
     selected && "ring-2 ring-brand-500 ring-offset-2 ring-offset-emerald-50 dark:ring-offset-slate-950",
     className,
   );
@@ -1552,7 +1557,15 @@ function CardView({
     if (!draggable) return;
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", label);
+    event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, event.currentTarget.offsetHeight / 2);
+    window.requestAnimationFrame(() => {
+      event.currentTarget.style.opacity = "0";
+    });
     onDragStart?.(event);
+  }
+  function handleDragEnd(event: DragEvent<HTMLElement>) {
+    event.currentTarget.style.opacity = "";
+    onDragEnd?.(event);
   }
   if (onClick) {
     return (
@@ -1562,8 +1575,9 @@ function CardView({
         title={label}
         draggable={draggable}
         onDragStart={handleDragStart}
-        onDragEnd={onDragEnd}
+        onDragEnd={handleDragEnd}
         onClick={onClick}
+        onDoubleClick={onDoubleClick}
         className={baseClass}
         style={viewStyle}
       />
@@ -1576,7 +1590,7 @@ function CardView({
       title={label}
       draggable={draggable}
       onDragStart={handleDragStart}
-      onDragEnd={onDragEnd}
+      onDragEnd={handleDragEnd}
       className={baseClass}
       style={viewStyle}
     />
@@ -1633,13 +1647,17 @@ function FoundationSlots({
   onClick,
   onDrop,
   onDragCard,
+  onDragEnd,
   selectedSuit,
+  draggingSuit,
 }: {
   foundations: FoundationState;
   onClick: (suit: Suit) => void;
   onDrop?: (suit: Suit) => void;
   onDragCard?: (suit: Suit) => void;
+  onDragEnd?: () => void;
   selectedSuit?: Suit;
+  draggingSuit?: Suit;
 }) {
   return (
     <div className="grid grid-cols-4 gap-[var(--card-gap)]">
@@ -1648,7 +1666,7 @@ function FoundationSlots({
         return (
           <CardSlot key={suit} label={`${suitLabels[suit]} A`} onClick={() => onClick(suit)} onDrop={onDrop ? () => onDrop(suit) : undefined} selected={selectedSuit === suit}>
             {top ? (
-              <CardView card={top} draggable={Boolean(onDragCard)} onDragStart={() => onDragCard?.(suit)} />
+              <CardView card={top} dragging={draggingSuit === suit} draggable={Boolean(onDragCard)} onDragStart={() => onDragCard?.(suit)} onDragEnd={onDragEnd} />
             ) : (
               <span className={cx("text-lg", suit === "H" || suit === "D" ? "text-brand-700 dark:text-brand-300" : "")}>{suitLabels[suit]}</span>
             )}
@@ -1668,6 +1686,8 @@ function StackedColumn({
   onColumnDrop,
   canDragCard,
   onDragCard,
+  onDragEnd,
+  draggingIndex,
 }: {
   cards: TableauCard[];
   minRows?: number;
@@ -1677,6 +1697,8 @@ function StackedColumn({
   onColumnDrop?: () => void;
   canDragCard?: (index: number) => boolean;
   onDragCard?: (index: number) => void;
+  onDragEnd?: () => void;
+  draggingIndex?: number;
 }) {
   const rows = Math.max(minRows, cards.length || 1);
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -1703,8 +1725,10 @@ function StackedColumn({
           card={card.code}
           hidden={!card.faceUp}
           selected={selectedIndex === index}
+          dragging={draggingIndex !== undefined && index >= draggingIndex}
           draggable={card.faceUp && (canDragCard?.(index) ?? true)}
           onDragStart={() => onDragCard?.(index)}
+          onDragEnd={onDragEnd}
           onClick={() => onCard(index)}
           style={{ position: "absolute", top: `calc(var(--fan-y) * ${index})`, left: 0 }}
         />
@@ -1761,6 +1785,7 @@ function Klondike({ record }: ExpandedGameProps) {
   const [drawCount, setDrawCount] = useState<"1" | "3">("1");
   const [game, setGame] = useState(createKlondikeState);
   const [selection, setSelection] = useState<KlondikeSelection | null>(null);
+  const [dragging, setDragging] = useState<KlondikeSelection | null>(null);
   const [message, setMessage] = useState("Arraste cartas ou toque para selecionar. Suba cada naipe do Ás ao Rei.");
   const [moves, setMoves] = useState(0);
   const [dealKey, setDealKey] = useState(0);
@@ -1770,6 +1795,7 @@ function Klondike({ record }: ExpandedGameProps) {
   function reset() {
     setGame(createKlondikeState());
     setSelection(null);
+    setDragging(null);
     setMoves(0);
     setWon(false);
     setDealKey((value) => value + 1);
@@ -1782,10 +1808,29 @@ function Klondike({ record }: ExpandedGameProps) {
     setMessage(value === "hard" ? "Difícil usa compra de 3 cartas." : value === "easy" ? "Fácil usa compra de 1 carta e dicas diretas." : "Médio usa compra de 1 carta.");
   }
 
-  function selectWaste() {
+  function moveSelectionToFoundation(selected: KlondikeSelection, targetSuit = cardSuit(selectedKlondikeCards(selected)[0].code)) {
+    const cards = selectedKlondikeCards(selected);
+    if (cards.length !== 1 || cardSuit(cards[0].code) !== targetSuit || !canMoveToFoundation(cards[0].code, game.foundations)) return false;
+    setGame((state) => {
+      if (!canMoveToFoundation(cards[0].code, state.foundations)) return state;
+      const next = removeKlondikeSelection(state, selected);
+      next.foundations[targetSuit].push(cards[0].code);
+      finishIfWon(next);
+      return next;
+    });
+    setMoves((value) => value + 1);
+    setSelection(null);
+    setDragging(null);
+    setMessage(`${cardLabel(cards[0].code)} foi para a fundação.`);
+    return true;
+  }
+
+  function selectWaste(autoFoundation = true) {
     const card = last(game.waste);
     if (!card) return;
-    setSelection({ source: "waste", card });
+    const nextSelection: KlondikeSelection = { source: "waste", card };
+    if (autoFoundation && moveSelectionToFoundation(nextSelection)) return;
+    setSelection(nextSelection);
     setMessage(`${cardLabel(card)} selecionada do descarte.`);
   }
 
@@ -1805,6 +1850,7 @@ function Klondike({ record }: ExpandedGameProps) {
 
   function draw() {
     setSelection(null);
+    setDragging(null);
     setGame((state) => {
       if (state.stock.length === 0) {
         if (state.waste.length === 0) {
@@ -1829,41 +1875,101 @@ function Klondike({ record }: ExpandedGameProps) {
       selectFoundation(suit);
       return;
     }
-    const cards = selectedKlondikeCards(selection);
-    if (cards.length !== 1 || cardSuit(cards[0].code) !== suit || !canMoveToFoundation(cards[0].code, game.foundations)) {
+    if (!moveSelectionToFoundation(selection, suit)) {
       setMessage("Essa carta não entra nessa fundação agora.");
-      return;
     }
-    setGame((state) => {
-      const next = removeKlondikeSelection(state, selection);
-      next.foundations[suit].push(cards[0].code);
-      finishIfWon(next);
-      return next;
-    });
-    setMoves((value) => value + 1);
-    setSelection(null);
-    setMessage(`${cardLabel(cards[0].code)} foi para a fundação.`);
   }
 
-  function moveToColumn(column: number) {
-    if (!selection) return;
-    const cards = selectedKlondikeCards(selection);
+  function moveToColumn(column: number, moving = selection) {
+    if (!moving) return;
+    const cards = selectedKlondikeCards(moving);
     const target = last(game.tableau[column]);
     if (!canStackOnTableau(cards[0].code, target?.faceUp ? target.code : undefined)) {
       setMessage("Movimento inválido para essa coluna.");
       return;
     }
     setGame((state) => {
-      const next = removeKlondikeSelection(state, selection);
+      const next = removeKlondikeSelection(state, moving);
       next.tableau[column] = [...next.tableau[column], ...cards.map((card) => ({ ...card, faceUp: true }))];
       return next;
     });
     setMoves((value) => value + 1);
     setSelection(null);
+    setDragging(null);
     setMessage("Sequência movida.");
   }
 
+  function autoFoundation() {
+    setSelection(null);
+    setDragging(null);
+    setGame((state) => {
+      const next: KlondikeState = {
+        tableau: state.tableau.map((column) => column.map((card) => ({ ...card }))),
+        stock: [...state.stock],
+        waste: [...state.waste],
+        foundations: { S: [...state.foundations.S], H: [...state.foundations.H], D: [...state.foundations.D], C: [...state.foundations.C] },
+      };
+      let moved = 0;
+      let changed = true;
+      while (changed) {
+        changed = false;
+        const wasteCard = last(next.waste);
+        if (wasteCard && canMoveToFoundation(wasteCard, next.foundations)) {
+          next.foundations[cardSuit(wasteCard)].push(wasteCard);
+          next.waste.pop();
+          moved += 1;
+          changed = true;
+        }
+        next.tableau.forEach((column) => {
+          const card = last(column);
+          if (card?.faceUp && canMoveToFoundation(card.code, next.foundations)) {
+            next.foundations[cardSuit(card.code)].push(card.code);
+            column.pop();
+            const top = last(column);
+            if (top && !top.faceUp) top.faceUp = true;
+            moved += 1;
+            changed = true;
+          }
+        });
+      }
+      if (moved) {
+        setMoves((value) => value + moved);
+        setMessage(`${moved} carta(s) óbvias subiram para a fundação.`);
+      } else {
+        setMessage("Nenhuma carta pronta para a fundação agora.");
+      }
+      finishIfWon(next);
+      return next;
+    });
+  }
+
+  function targetFromSelection() {
+    if (selection?.source !== "tableau" || selection.cards.length !== 1) return null;
+    if (selection.index !== game.tableau[selection.column].length - 1) return null;
+    return { column: selection.column, card: selection.cards[0].code };
+  }
+
+  function beginTableauDrag(column: number, index: number) {
+    const cards = game.tableau[column].slice(index);
+    if (!cards.length || !cards.every((card) => card.faceUp)) return;
+    const nextSelection: KlondikeSelection = { source: "tableau", column, index, cards };
+    setSelection(nextSelection);
+    setDragging(nextSelection);
+    setMessage(`${cards.length} carta(s) sendo arrastada(s).`);
+  }
+
   function clickColumn(column: number, index?: number) {
+    if (selection && index !== undefined) {
+      const card = game.tableau[column][index];
+      const target = targetFromSelection();
+      if (card?.faceUp && target && target.column !== column) {
+        const moving: KlondikeSelection = { source: "tableau", column, index, cards: game.tableau[column].slice(index) };
+        if (canStackOnTableau(moving.cards[0].code, target.card)) {
+          moveToColumn(target.column, moving);
+          return;
+        }
+      }
+    }
     if (selection && (index === undefined || selection.source !== "tableau" || selection.column !== column || selection.index !== index)) {
       moveToColumn(column);
       return;
@@ -1883,7 +1989,9 @@ function Klondike({ record }: ExpandedGameProps) {
       return;
     }
     const cards = game.tableau[column].slice(index);
-    setSelection({ source: "tableau", column, index, cards });
+    const nextSelection: KlondikeSelection = { source: "tableau", column, index, cards };
+    if (cards.length === 1 && moveSelectionToFoundation(nextSelection)) return;
+    setSelection(nextSelection);
     setMessage(`${cards.length} carta(s) selecionada(s).`);
   }
 
@@ -1949,6 +2057,7 @@ function Klondike({ record }: ExpandedGameProps) {
           <Select label="Dificuldade" value={difficulty} options={difficultyChoices} onChange={changeDifficulty} />
           <Select label="Compra" value={drawCount} options={[{ value: "1", label: "1 carta" }, { value: "3", label: "3 cartas" }]} onChange={setDrawCount} />
           <Button onClick={showHint} tone="primary">Dica</Button>
+          <Button onClick={autoFoundation}>Auto fundação</Button>
           <Button onClick={reset}>Reiniciar</Button>
         </>
       }
@@ -1973,9 +2082,15 @@ function Klondike({ record }: ExpandedGameProps) {
                 <CardView
                   card={last(game.waste)}
                   selected={selection?.source === "waste"}
+                  dragging={dragging?.source === "waste"}
                   draggable
-                  onDragStart={selectWaste}
-                  onClick={selectWaste}
+                  onDragStart={() => {
+                    selectWaste(false);
+                    const card = last(game.waste);
+                    if (card) setDragging({ source: "waste", card });
+                  }}
+                  onDragEnd={() => setDragging(null)}
+                  onClick={() => selectWaste(true)}
                 />
               ) : null}
             </CardSlot>
@@ -1984,8 +2099,15 @@ function Klondike({ record }: ExpandedGameProps) {
               foundations={game.foundations}
               onClick={moveToFoundation}
               onDrop={moveToFoundation}
-              onDragCard={selectFoundation}
+              onDragCard={(suit) => {
+                const card = last(game.foundations[suit]);
+                if (!card) return;
+                selectFoundation(suit);
+                setDragging({ source: "foundation", suit, card });
+              }}
+              onDragEnd={() => setDragging(null)}
               selectedSuit={selection?.source === "foundation" ? selection.suit : undefined}
+              draggingSuit={dragging?.source === "foundation" ? dragging.suit : undefined}
             />
           </div>
           <div className="grid grid-cols-7 gap-[var(--card-gap)]">
@@ -1994,11 +2116,13 @@ function Klondike({ record }: ExpandedGameProps) {
                 key={index}
                 cards={column}
                 selectedIndex={selectedColumn === index && selection?.source === "tableau" ? selection.index : undefined}
+                draggingIndex={dragging?.source === "tableau" && dragging.column === index ? dragging.index : undefined}
                 onCard={(cardIndex) => clickColumn(index, cardIndex)}
                 onEmpty={() => moveToColumn(index)}
                 onColumnDrop={() => moveToColumn(index)}
                 canDragCard={(cardIndex) => column[cardIndex].faceUp}
-                onDragCard={(cardIndex) => clickColumn(index, cardIndex)}
+                onDragCard={(cardIndex) => beginTableauDrag(index, cardIndex)}
+                onDragEnd={() => setDragging(null)}
               />
             ))}
           </div>
@@ -2030,6 +2154,7 @@ function FreeCell({ record }: ExpandedGameProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [game, setGame] = useState(createFreeCellState);
   const [selection, setSelection] = useState<FreeCellSelection | null>(null);
+  const [dragging, setDragging] = useState<FreeCellSelection | null>(null);
   const [message, setMessage] = useState("Use as células livres para abrir caminho até as fundações.");
   const [moves, setMoves] = useState(0);
   const [dealKey, setDealKey] = useState(0);
@@ -2039,6 +2164,7 @@ function FreeCell({ record }: ExpandedGameProps) {
   function reset() {
     setGame(createFreeCellState());
     setSelection(null);
+    setDragging(null);
     setMoves(0);
     setWon(false);
     setDealKey((value) => value + 1);
@@ -2057,6 +2183,31 @@ function FreeCell({ record }: ExpandedGameProps) {
     return next;
   }
 
+  function moveSelectionToFoundation(selected: FreeCellSelection, targetSuit = cardSuit(selected.card)) {
+    if (cardSuit(selected.card) !== targetSuit || !canMoveToFoundation(selected.card, game.foundations)) return false;
+    setGame((state) => {
+      if (!canMoveToFoundation(selected.card, state.foundations)) return state;
+      const next = removeSelection(state, selected);
+      next.foundations[targetSuit].push(selected.card);
+      finishIfWon(next);
+      return next;
+    });
+    setMoves((value) => value + 1);
+    setSelection(null);
+    setDragging(null);
+    setMessage(`${cardLabel(selected.card)} subiu para a fundação.`);
+    return true;
+  }
+
+  function beginColumnDrag(column: number) {
+    const card = last(game.columns[column]);
+    if (!card) return;
+    const nextSelection: FreeCellSelection = { source: "column", column, card };
+    setSelection(nextSelection);
+    setDragging(nextSelection);
+    setMessage(`${cardLabel(card)} sendo arrastada.`);
+  }
+
   function selectColumn(column: number) {
     const card = last(game.columns[column]);
     if (!card) {
@@ -2067,7 +2218,9 @@ function FreeCell({ record }: ExpandedGameProps) {
       moveToColumn(column);
       return;
     }
-    setSelection({ source: "column", column, card });
+    const nextSelection: FreeCellSelection = { source: "column", column, card };
+    if (moveSelectionToFoundation(nextSelection)) return;
+    setSelection(nextSelection);
     setMessage(`${cardLabel(card)} selecionada.`);
   }
 
@@ -2097,12 +2250,16 @@ function FreeCell({ record }: ExpandedGameProps) {
     });
     setMoves((value) => value + 1);
     setSelection(null);
+    setDragging(null);
     setMessage("Carta movida para coluna.");
   }
 
   function moveToCell(cell: number) {
     if (game.cells[cell] && !selection) {
-      setSelection({ source: "cell", cell, card: game.cells[cell]! });
+      const card = game.cells[cell]!;
+      const nextSelection: FreeCellSelection = { source: "cell", cell, card };
+      if (moveSelectionToFoundation(nextSelection)) return;
+      setSelection(nextSelection);
       setMessage(`${cardLabel(game.cells[cell]!)} selecionada.`);
       return;
     }
@@ -2114,6 +2271,7 @@ function FreeCell({ record }: ExpandedGameProps) {
     });
     setMoves((value) => value + 1);
     setSelection(null);
+    setDragging(null);
     setMessage("Carta guardada na célula livre.");
   }
 
@@ -2123,23 +2281,14 @@ function FreeCell({ record }: ExpandedGameProps) {
       if (top) setSelection({ source: "foundation", suit, card: top });
       return;
     }
-    if (cardSuit(selection.card) !== suit || !canMoveToFoundation(selection.card, game.foundations)) {
+    if (!moveSelectionToFoundation(selection, suit)) {
       setMessage("Fundação ainda não aceita essa carta.");
-      return;
     }
-    setGame((state) => {
-      const next = removeSelection(state, selection);
-      next.foundations[suit].push(selection.card);
-      finishIfWon(next);
-      return next;
-    });
-    setMoves((value) => value + 1);
-    setSelection(null);
-    setMessage("Carta enviada para fundação.");
   }
 
   function autoFoundation() {
     setSelection(null);
+    setDragging(null);
     setGame((state) => {
       let next: FreeCellState = {
         columns: state.columns.map((column) => [...column]),
@@ -2244,11 +2393,15 @@ function FreeCell({ record }: ExpandedGameProps) {
                 {card ? (
                   <CardView
                     card={card}
+                    dragging={dragging?.source === "cell" && dragging.cell === index}
                     draggable
                     onDragStart={() => {
-                      setSelection({ source: "cell", cell: index, card });
+                      const nextSelection: FreeCellSelection = { source: "cell", cell: index, card };
+                      setSelection(nextSelection);
+                      setDragging(nextSelection);
                       setMessage(`${cardLabel(card)} selecionada.`);
                     }}
+                    onDragEnd={() => setDragging(null)}
                   />
                 ) : null}
               </CardSlot>
@@ -2260,9 +2413,14 @@ function FreeCell({ record }: ExpandedGameProps) {
               onDrop={moveToFoundationSlot}
               onDragCard={(suit) => {
                 const card = last(game.foundations[suit]);
-                if (card) setSelection({ source: "foundation", suit, card });
+                if (!card) return;
+                const nextSelection: FreeCellSelection = { source: "foundation", suit, card };
+                setSelection(nextSelection);
+                setDragging(nextSelection);
               }}
+              onDragEnd={() => setDragging(null)}
               selectedSuit={selection?.source === "foundation" ? selection.suit : undefined}
+              draggingSuit={dragging?.source === "foundation" ? dragging.suit : undefined}
             />
           </div>
           <div className="grid grid-cols-8 gap-[var(--card-gap)]">
@@ -2272,11 +2430,13 @@ function FreeCell({ record }: ExpandedGameProps) {
                 cards={column.map((code) => ({ code, faceUp: true }))}
                 minRows={7}
                 selectedIndex={selection?.source === "column" && selection.column === columnIndex ? column.length - 1 : undefined}
+                draggingIndex={dragging?.source === "column" && dragging.column === columnIndex ? column.length - 1 : undefined}
                 onCard={(cardIndex) => (cardIndex === column.length - 1 ? selectColumn(columnIndex) : undefined)}
                 onEmpty={() => selectColumn(columnIndex)}
                 onColumnDrop={() => moveToColumn(columnIndex)}
                 canDragCard={(cardIndex) => cardIndex === column.length - 1}
-                onDragCard={() => selectColumn(columnIndex)}
+                onDragCard={() => beginColumnDrag(columnIndex)}
+                onDragEnd={() => setDragging(null)}
               />
             ))}
           </div>
@@ -2339,6 +2499,7 @@ function Spider({ record }: ExpandedGameProps) {
   const [suits, setSuits] = useState<"1" | "2" | "4">("1");
   const [game, setGame] = useState(() => createSpiderState("1"));
   const [selection, setSelection] = useState<SpiderSelection | null>(null);
+  const [dragging, setDragging] = useState<SpiderSelection | null>(null);
   const [message, setMessage] = useState("Monte sequências do Rei ao Ás do mesmo naipe para remover.");
   const [moves, setMoves] = useState(0);
   const [dealKey, setDealKey] = useState(0);
@@ -2348,6 +2509,7 @@ function Spider({ record }: ExpandedGameProps) {
   function reset(nextSuits = suits) {
     setGame(createSpiderState(nextSuits));
     setSelection(null);
+    setDragging(null);
     setMoves(0);
     setWon(false);
     setDealKey((value) => value + 1);
@@ -2376,7 +2538,17 @@ function Spider({ record }: ExpandedGameProps) {
     });
     setMoves((value) => value + 1);
     setSelection(null);
+    setDragging(null);
     setMessage("Nova linha distribuída.");
+  }
+
+  function beginSpiderDrag(column: number, index: number) {
+    const moving = game.columns[column].slice(index);
+    if (!isSpiderRun(moving)) return;
+    const nextSelection = { column, index, cards: moving };
+    setSelection(nextSelection);
+    setDragging(nextSelection);
+    setMessage(`${moving.length} carta(s) sendo arrastada(s).`);
   }
 
   function clickColumn(column: number, index?: number) {
@@ -2403,6 +2575,7 @@ function Spider({ record }: ExpandedGameProps) {
       });
       setMoves((value) => value + 1);
       setSelection(null);
+      setDragging(null);
       setMessage("Sequência movida.");
       return;
     }
@@ -2474,11 +2647,13 @@ function Spider({ record }: ExpandedGameProps) {
                 cards={column}
                 minRows={9}
                 selectedIndex={selection?.column === columnIndex ? selection.index : undefined}
+                draggingIndex={dragging?.column === columnIndex ? dragging.index : undefined}
                 onCard={(cardIndex) => clickColumn(columnIndex, cardIndex)}
                 onEmpty={() => clickColumn(columnIndex)}
                 onColumnDrop={() => clickColumn(columnIndex)}
                 canDragCard={(cardIndex) => isSpiderRun(column.slice(cardIndex))}
-                onDragCard={(cardIndex) => clickColumn(columnIndex, cardIndex)}
+                onDragCard={(cardIndex) => beginSpiderDrag(columnIndex, cardIndex)}
+                onDragEnd={() => setDragging(null)}
               />
             ))}
           </div>
@@ -2659,6 +2834,7 @@ function Hearts({ record }: ExpandedGameProps) {
               <CardView
                 key={card}
                 card={card}
+                dragging={draggedCard === card}
                 draggable={game.currentPlayer === 0 && valid.has(card)}
                 onDragStart={() => setDraggedCard(card)}
                 onDragEnd={() => setDraggedCard(null)}
@@ -2673,11 +2849,13 @@ function Hearts({ record }: ExpandedGameProps) {
   );
 }
 
+type TrucoSide = "player" | "bot";
+
 type TrucoState = {
   player: CardCode[];
   bot: CardCode[];
   vira: CardCode;
-  table: Array<{ player: "player" | "bot"; card: CardCode }>;
+  table: Array<{ player: TrucoSide; card: CardCode }>;
   roundWins: { player: number; bot: number };
   score: { player: number; bot: number };
   handValue: 1 | 3 | 6 | 9 | 12;
@@ -2719,20 +2897,29 @@ function trucoPower(card: CardCode, vira: CardCode) {
   return trucoRanks.indexOf(rank);
 }
 
+function trucoSideLabel(side: TrucoSide, local: boolean) {
+  if (!local) return side === "player" ? "Você" : "IA";
+  return side === "player" ? "Jogador 1" : "Jogador 2";
+}
+
 function TrucoPaulista({ record }: ExpandedGameProps) {
   const [mode, setMode] = useState<PlayMode>("ai");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [game, setGame] = useState(createTrucoState);
+  const [viewing, setViewing] = useState<TrucoSide | null>("player");
   const [message, setMessage] = useState("Jogue uma carta. A manilha é definida pelo vira.");
   const [moves, setMoves] = useState(0);
   const [dealKey, setDealKey] = useState(0);
   const [draggedCard, setDraggedCard] = useState<CardCode | null>(null);
+  const [draggedSide, setDraggedSide] = useState<TrucoSide | null>(null);
   const elapsed = useElapsedSeconds(!game.over, dealKey);
 
   function reset(score = { player: 0, bot: 0 }) {
     setGame(createTrucoState(score));
+    setViewing("player");
     setMoves(0);
     setDraggedCard(null);
+    setDraggedSide(null);
     setDealKey((value) => value + 1);
     setMessage("Nova mão distribuída.");
   }
@@ -2745,10 +2932,11 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
     const playerPower = trucoPower(playerCard, state.vira);
     const botPower = trucoPower(botCard, state.vira);
     const roundWins = { ...state.roundWins };
-    if (playerPower >= botPower) roundWins.player += 1;
+    const playerWonTrick = playerPower >= botPower;
+    if (playerWonTrick) roundWins.player += 1;
     else roundWins.bot += 1;
     const handDone = roundWins.player >= 2 || roundWins.bot >= 2 || (state.player.length === 0 && state.bot.length === 0);
-    if (!handDone) return { ...state, table: [], roundWins, playerTurn: roundWins.player >= roundWins.bot };
+    if (!handDone) return { ...state, table: [], roundWins, playerTurn: playerWonTrick };
     const score = { ...state.score };
     const playerWon = roundWins.player >= roundWins.bot;
     score[playerWon ? "player" : "bot"] += state.handValue;
@@ -2758,7 +2946,7 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
     return { ...createTrucoState(score), over };
   }
 
-  function play(card: CardCode) {
+  function playAi(card: CardCode) {
     if (game.over || !game.playerTurn) return;
     setGame((state) => {
       const player = state.player.filter((item) => item !== card);
@@ -2778,6 +2966,39 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
     setMoves((value) => value + 1);
   }
 
+  function playLocal(card: CardCode, side: TrucoSide) {
+    if (game.over || viewing !== side || game.playerTurn !== (side === "player")) return;
+    setGame((state) => {
+      if (state.over || state.playerTurn !== (side === "player")) return state;
+      const hand = state[side];
+      if (!hand.includes(card)) return state;
+      const table = [...state.table, { player: side, card }];
+      const nextSide: TrucoSide = side === "player" ? "bot" : "player";
+      const nextState =
+        side === "player"
+          ? { ...state, player: state.player.filter((item) => item !== card), table, playerTurn: false }
+          : { ...state, bot: state.bot.filter((item) => item !== card), table, playerTurn: true };
+      if (table.length >= 2) {
+        setViewing(null);
+        setMessage("Rodada na mesa. Conferindo vencedor...");
+        window.setTimeout(() => {
+          setGame((current) => finishTrick(current));
+          setViewing(null);
+        }, 850);
+      } else {
+        setViewing(null);
+        setMessage(`Passe para ${trucoSideLabel(nextSide, true)} e toque em Estou pronto.`);
+      }
+      return nextState;
+    });
+    setMoves((value) => value + 1);
+  }
+
+  function play(card: CardCode, side: TrucoSide = "player") {
+    if (mode === "local") playLocal(card, side);
+    else playAi(card);
+  }
+
   function raise() {
     const nextValue = game.handValue === 1 ? 3 : game.handValue === 3 ? 6 : game.handValue === 6 ? 9 : 12;
     setGame((state) => ({ ...state, handValue: nextValue }));
@@ -2790,15 +3011,31 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
     setMessage(`Dica: ${game.handValue >= 3 ? "proteja a mão com" : "guarde força e jogue"} ${cardLabel(card)}.`);
   }
 
+  const isLocal = mode === "local";
+  const currentSide: TrucoSide = game.playerTurn ? "player" : "bot";
+  const activeSide: TrucoSide = isLocal && viewing === "bot" ? "bot" : "player";
+  const activeHand = isLocal ? (viewing ? game[viewing] : []) : game.player;
+  const hiddenHand = isLocal ? (viewing === "bot" ? game.player : game.bot) : game.bot;
+  const canPlayActiveHand = isLocal ? viewing === currentSide && !game.over : game.playerTurn && !game.over;
+  const waitingForLocalPlayer = isLocal && !game.over && viewing !== currentSide;
+
   return (
     <GameFrame
-      status={`${message} Placar ${game.score.player} x ${game.score.bot}. Manilha: ${trucoManilha(game.vira)}.`}
+      status={`${message} Placar ${game.score.player} x ${game.score.bot}. Manilha: ${trucoManilha(game.vira)}.${isLocal ? ` Vez: ${trucoSideLabel(currentSide, true)}.` : ""}`}
       actions={
         <>
-          <Select label="Modo" value={mode} options={modeChoices} onChange={setMode} />
+          <Select
+            label="Modo"
+            value={mode}
+            options={modeChoices}
+            onChange={(value) => {
+              setMode(value);
+              reset();
+            }}
+          />
           <Select label="Dificuldade" value={difficulty} options={difficultyChoices} onChange={setDifficulty} />
-          <Button onClick={showHint} tone="primary">Dica</Button>
-          <Button onClick={raise} disabled={game.handValue === 12}>{game.handValue === 1 ? "Pedir truco" : game.handValue === 3 ? "Pedir seis" : game.handValue === 6 ? "Pedir nove" : "Pedir doze"}</Button>
+          {!isLocal && <Button onClick={showHint} tone="primary">Dica</Button>}
+          <Button onClick={raise} disabled={game.handValue === 12 || (isLocal && waitingForLocalPlayer)}>{game.handValue === 1 ? "Pedir truco" : game.handValue === 3 ? "Pedir seis" : game.handValue === 6 ? "Pedir nove" : "Pedir doze"}</Button>
           <Button onClick={() => reset()}>Reiniciar</Button>
         </>
       }
@@ -2815,7 +3052,12 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
             ]}
           />
           <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-            <div className="flex justify-center gap-1">{game.bot.map((_, index) => <CardView key={index} hidden />)}</div>
+            <div className="grid justify-items-center gap-1">
+              <div className="flex justify-center gap-1">{hiddenHand.map((_, index) => <CardView key={index} hidden />)}</div>
+              <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300">
+                {isLocal ? `${trucoSideLabel(viewing === "bot" ? "player" : "bot", true)} (${hiddenHand.length})` : `IA (${hiddenHand.length})`}
+              </span>
+            </div>
             <div className="grid justify-items-center gap-1">
               <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300">Vira</span>
               <CardView card={game.vira} />
@@ -2833,24 +3075,55 @@ function TrucoPaulista({ record }: ExpandedGameProps) {
             }}
             onDrop={(event) => {
               event.preventDefault();
-              if (draggedCard) play(draggedCard);
+              if (draggedCard) play(draggedCard, draggedSide ?? "player");
               setDraggedCard(null);
+              setDraggedSide(null);
             }}
           >
-            {game.table.length ? game.table.map((item) => <CardView key={`${item.player}-${item.card}`} card={item.card} title={`${item.player === "player" ? "Você" : "IA"}: ${cardLabel(item.card)}`} />) : <span className="text-sm font-black uppercase text-slate-600 dark:text-slate-400">Mesa</span>}
+            {game.table.length ? game.table.map((item) => <CardView key={`${item.player}-${item.card}`} card={item.card} title={`${trucoSideLabel(item.player, isLocal)}: ${cardLabel(item.card)}`} />) : <span className="text-sm font-black uppercase text-slate-600 dark:text-slate-400">Mesa</span>}
           </div>
-          <div className="flex justify-center gap-2">
-            {game.player.map((card) => (
-              <CardView
-                key={card}
-                card={card}
-                draggable={game.playerTurn}
-                onDragStart={() => setDraggedCard(card)}
-                onDragEnd={() => setDraggedCard(null)}
-                onClick={() => play(card)}
-                selected={game.playerTurn}
-              />
-            ))}
+          <div className="min-h-[calc(var(--card-w)*1.5)]">
+            {waitingForLocalPlayer ? (
+              <div className="grid min-h-[calc(var(--card-w)*1.5)] place-items-center rounded-2xl border border-brand-500/25 bg-brand-50 p-4 text-center dark:border-brand-500/25 dark:bg-brand-500/10">
+                <div className="grid gap-2">
+                  <span className="text-sm font-black uppercase text-brand-800 dark:text-brand-200">Passe o aparelho</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewing(currentSide);
+                      setMessage(`${trucoSideLabel(currentSide, true)} pode jogar.`);
+                    }}
+                    className="min-h-11 rounded-xl bg-brand-500 px-4 py-2 text-sm font-black text-black shadow-sm hover:bg-brand-400"
+                  >
+                    Estou pronto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid justify-items-center gap-2">
+                {isLocal && <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300">{trucoSideLabel(activeSide, true)} ({activeHand.length})</span>}
+                <div className="flex justify-center gap-2">
+                  {activeHand.map((card) => (
+                    <CardView
+                      key={card}
+                      card={card}
+                      dragging={draggedCard === card}
+                      draggable={canPlayActiveHand}
+                      onDragStart={() => {
+                        setDraggedCard(card);
+                        setDraggedSide(activeSide);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedCard(null);
+                        setDraggedSide(null);
+                      }}
+                      onClick={() => play(card, activeSide)}
+                      selected={canPlayActiveHand}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </CardViewport>
       </CardTable>

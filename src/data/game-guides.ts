@@ -1842,9 +1842,11 @@ const gameGuides: Record<string, GameGuide> = {
       "Compra pode ser de 1 ou 3 cartas conforme opcao.",
     ],
     controls: [
-      "Clique na carta de origem e depois no destino.",
+      "Clique em Ases e cartas prontas para fundacao para subi-las automaticamente.",
+      "Clique em uma carta ou sequencia e depois no destino; se voce clicar primeiro no alvo e depois na carta que encaixa, o jogo tambem entende a jogada.",
+      "Arraste uma carta ou sequencia ate uma coluna ou fundacao; a carta sai visualmente da origem enquanto voce arrasta.",
       "Clique no estoque para comprar cartas.",
-      "Use auto movimento quando a interface oferecer.",
+      "Use Auto fundacao para subir todas as cartas obvias disponiveis no momento.",
     ],
     visual: [
       "Fundacoes ficam no topo e organizam naipes.",
@@ -1876,7 +1878,10 @@ const gameGuides: Record<string, GameGuide> = {
       "A quantidade de cartas que voce consegue mover em sequencia depende de celulas e colunas livres.",
     ],
     controls: [
+      "Clique em uma carta pronta para fundacao para subi-la automaticamente.",
       "Clique na carta, celula, coluna ou fundacao de origem e destino.",
+      "Arraste cartas entre colunas, celulas livres e fundacoes; a carta arrastada some da origem durante o movimento.",
+      "Use Auto fundacao para subir cartas que ja estejam liberadas.",
     ],
     visual: [
       "Celulas livres sao vagas temporarias.",
@@ -1909,6 +1914,7 @@ const gameGuides: Record<string, GameGuide> = {
     ],
     controls: [
       "Clique na carta ou sequencia e depois no destino.",
+      "Arraste uma sequencia aberta e do mesmo naipe para outra coluna; a sequencia sai visualmente da origem durante o arraste.",
       "Clique no estoque para distribuir nova fileira.",
     ],
     visual: [
@@ -1943,6 +1949,7 @@ const gameGuides: Record<string, GameGuide> = {
     ],
     controls: [
       "Clique em uma carta valida da sua mao.",
+      "Arraste uma carta valida para o centro da mesa; ela sai visualmente da mao durante o arraste.",
       "Use botoes de passar cartas quando a fase pedir.",
     ],
     visual: [
@@ -1960,10 +1967,12 @@ const gameGuides: Record<string, GameGuide> = {
     setup: [
       "Cada jogador ou dupla recebe 3 cartas.",
       "Uma carta vira e define as manilhas, que sao as cartas mais fortes da mao.",
+      "No modo local, use o botao Estou pronto para revelar somente a mao do jogador da vez.",
     ],
     steps: [
       "Observe o vira para saber quais cartas sao manilhas.",
       "Jogue uma carta na rodada.",
+      "No modo local, depois de jogar, passe o aparelho para o proximo jogador antes de tocar em Estou pronto.",
       "Compare as cartas para decidir quem ganhou a vaza.",
       "Quem vence duas das tres vazas ganha a mao.",
       "Peca truco, seis, nove ou doze quando quiser aumentar o valor da mao.",
@@ -1977,6 +1986,8 @@ const gameGuides: Record<string, GameGuide> = {
     ],
     controls: [
       "Clique em uma carta para jogar.",
+      "Arraste a carta para a mesa; ela sai visualmente da mao durante o arraste.",
+      "No modo local, toque em Estou pronto apenas quando o aparelho estiver com o jogador correto.",
       "Use botoes de truco, aceitar, correr ou aumentar quando aparecerem.",
     ],
     visual: [
@@ -2016,4 +2027,3 @@ export function getGameGuide(game: GameMeta): GameGuide {
     }
   );
 }
-

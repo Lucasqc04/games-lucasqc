@@ -1,5 +1,5 @@
-const CACHE_NAME = "lucasqc-games-cache-v8";
-const STATIC_CACHE = "lucasqc-games-static-v8";
+const CACHE_NAME = "lucasqc-games-cache-v9";
+const STATIC_CACHE = "lucasqc-games-static-v9";
 const CORE_URLS = [
   "/",
   "/jogos",
