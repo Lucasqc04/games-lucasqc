@@ -102,6 +102,25 @@ a:focus-visible {
   background: var(--game-stage-bg);
 }
 
+.tile-2048 {
+  width: calc((100% - (var(--tile-gap) * 3)) / 4);
+  aspect-ratio: 1 / 1;
+  transform: translate(
+    calc(var(--tile-x) * (100% + var(--tile-gap))),
+    calc(var(--tile-y) * (100% + var(--tile-gap)))
+  );
+  transition: transform 155ms cubic-bezier(0.2, 0.82, 0.2, 1);
+  will-change: transform;
+}
+
+.tile-2048-new {
+  animation: tile-2048-spawn 155ms ease-out both;
+}
+
+.tile-2048-merged {
+  animation: tile-2048-merge 190ms ease-out both;
+}
+
 .termo-board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(var(--termo-board-min), var(--termo-board-width)));
@@ -165,6 +184,29 @@ a:focus-visible {
   }
   80% {
     transform: translateX(5px);
+  }
+}
+
+@keyframes tile-2048-spawn {
+  0% {
+    opacity: 0;
+    scale: 0.72;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes tile-2048-merge {
+  0% {
+    scale: 1;
+  }
+  52% {
+    scale: 1.14;
+  }
+  100% {
+    scale: 1;
   }
 }
 

@@ -2467,88 +2467,124 @@ function Sudoku({ record, stats, sound }: GameComponentProps) {
 
 // 15. 2048
 type Board2048 = number[][];
+type Tile2048 = { id: number; value: number; x: number; y: number; merged?: boolean; fresh?: boolean };
+type Direction2048 = "left" | "right" | "up" | "down";
 
 function empty2048(): Board2048 {
   return range(4).map(() => range(4).map(() => 0));
 }
 
-function addTile(board: Board2048) {
-  const empty = board.flatMap((row, y) => row.map((cell, x) => (cell === 0 ? [x, y] : null))).filter(Boolean) as number[][];
-  if (!empty.length) return board;
-  const [x, y] = randomItem(empty);
-  const next = board.map((row) => [...row]);
-  next[y][x] = Math.random() > 0.9 ? 4 : 2;
-  return next;
+function boardFromTiles2048(tiles: Tile2048[]): Board2048 {
+  const board = empty2048();
+  tiles.forEach((tile) => {
+    board[tile.y][tile.x] = tile.value;
+  });
+  return board;
 }
 
-function start2048() {
-  return addTile(addTile(empty2048()));
+function addTile2048(tiles: Tile2048[], nextId: () => number, fresh = true) {
+  const used = new Set(tiles.map((tile) => `${tile.x},${tile.y}`));
+  const empty = range(4).flatMap((y) => range(4).map((x) => (used.has(`${x},${y}`) ? null : { x, y }))).filter(Boolean) as Array<{ x: number; y: number }>;
+  if (!empty.length) return tiles;
+  const cell = randomItem(empty);
+  return [...tiles, { id: nextId(), value: Math.random() > 0.9 ? 4 : 2, x: cell.x, y: cell.y, fresh }];
 }
 
-function mergeLine(line: number[]) {
-  const values = line.filter(Boolean);
-  const result: number[] = [];
+function start2048(nextId: () => number) {
+  return addTile2048(addTile2048([], nextId), nextId);
+}
+
+function lineCells2048(dir: Direction2048, line: number) {
+  if (dir === "left") return range(4).map((x) => ({ x, y: line }));
+  if (dir === "right") return range(4).map((offset) => ({ x: 3 - offset, y: line }));
+  if (dir === "up") return range(4).map((y) => ({ x: line, y }));
+  return range(4).map((offset) => ({ x: line, y: 3 - offset }));
+}
+
+function planMove2048(tiles: Tile2048[], dir: Direction2048) {
+  const tileAt = new Map(tiles.map((tile) => [`${tile.x},${tile.y}`, tile]));
+  const moving: Tile2048[] = [];
+  const finalTiles: Tile2048[] = [];
   let score = 0;
-  for (let i = 0; i < values.length; i += 1) {
-    if (values[i] === values[i + 1]) {
-      result.push(values[i] * 2);
-      score += values[i] * 2;
-      i += 1;
-    } else result.push(values[i]);
-  }
-  while (result.length < 4) result.push(0);
-  return { line: result, score };
-}
+  let changed = false;
 
-function move2048(board: Board2048, dir: "left" | "right" | "up" | "down") {
-  let score = 0;
-  const next = empty2048();
-  for (let i = 0; i < 4; i += 1) {
-    const line = dir === "left" || dir === "right" ? board[i] : board.map((row) => row[i]);
-    const input = dir === "right" || dir === "down" ? [...line].reverse() : line;
-    const merged = mergeLine(input);
-    score += merged.score;
-    const output = dir === "right" || dir === "down" ? merged.line.reverse() : merged.line;
-    output.forEach((value, j) => {
-      if (dir === "left" || dir === "right") next[i][j] = value;
-      else next[j][i] = value;
-    });
+  for (let line = 0; line < 4; line += 1) {
+    const cells = lineCells2048(dir, line);
+    const lineTiles = cells.map((cell) => tileAt.get(`${cell.x},${cell.y}`)).filter(Boolean) as Tile2048[];
+    let targetIndex = 0;
+    for (let i = 0; i < lineTiles.length; i += 1) {
+      const current = lineTiles[i];
+      const next = lineTiles[i + 1];
+      const target = cells[targetIndex];
+      if (next && current.value === next.value) {
+        moving.push({ ...current, x: target.x, y: target.y, fresh: false, merged: false });
+        moving.push({ ...next, x: target.x, y: target.y, fresh: false, merged: false });
+        finalTiles.push({ id: current.id, value: current.value * 2, x: target.x, y: target.y, merged: true });
+        score += current.value * 2;
+        changed = true;
+        i += 1;
+      } else {
+        moving.push({ ...current, x: target.x, y: target.y, fresh: false, merged: false });
+        finalTiles.push({ id: current.id, value: current.value, x: target.x, y: target.y });
+        changed = changed || current.x !== target.x || current.y !== target.y;
+      }
+      targetIndex += 1;
+    }
   }
-  const changed = JSON.stringify(board) !== JSON.stringify(next);
-  return { board: changed ? addTile(next) : board, score, changed };
+
+  return { moving, finalTiles, score, changed };
 }
 
 function canMove2048(board: Board2048) {
   if (board.flat().some((cell) => cell === 0)) return true;
-  return ["left", "right", "up", "down"].some((dir) => move2048(board, dir as "left").changed);
+  return range(4).some((y) =>
+    range(4).some((x) => {
+      const value = board[y][x];
+      return board[y][x + 1] === value || board[y + 1]?.[x] === value;
+    }),
+  );
 }
 
 const tileAssets2048 = new Set([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]);
 
 function Game2048({ record, stats, sound }: GameComponentProps) {
   const dragStart = useRef<{ x: number; y: number } | null>(null);
-  const [board, setBoard] = useState<Board2048>(start2048);
+  const tileIdRef = useRef(1);
+  const animationRef = useRef<number | null>(null);
+  const animatingRef = useRef(false);
+  const nextTileId = () => tileIdRef.current++;
+  const [tiles, setTiles] = useState<Tile2048[]>(() => start2048(nextTileId));
   const [score, setScore] = useState(0);
   const [ended, setEnded] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>("all");
 
   function reset() {
-    setBoard(start2048());
+    if (animationRef.current) window.clearTimeout(animationRef.current);
+    tileIdRef.current = 1;
+    animatingRef.current = false;
+    setTiles(start2048(nextTileId));
     setScore(0);
     setEnded(false);
   }
 
-  function move(dir: "left" | "right" | "up" | "down") {
-    if (ended) return;
-    const result = move2048(board, dir);
+  function move(dir: Direction2048) {
+    if (ended || animatingRef.current) return;
+    const result = planMove2048(tiles, dir);
     if (!result.changed) return;
     const nextScore = score + result.score;
-    setBoard(result.board);
+    animatingRef.current = true;
+    setTiles(result.moving);
     setScore(nextScore);
-    if (!canMove2048(result.board)) {
-      setEnded(true);
-      finish(record, { winner: result.board.flat().some((cell) => cell >= 2048) ? "solo" : "machine", score: nextScore }, sound);
-    }
+    animationRef.current = window.setTimeout(() => {
+      const finalTiles = addTile2048(result.finalTiles, nextTileId);
+      const finalBoard = boardFromTiles2048(finalTiles);
+      setTiles(finalTiles);
+      animatingRef.current = false;
+      if (!canMove2048(finalBoard)) {
+        setEnded(true);
+        finish(record, { winner: finalBoard.flat().some((cell) => cell >= 2048) ? "solo" : "machine", score: nextScore }, sound);
+      }
+    }, 155);
   }
 
   function finishSwipe(point: { x: number; y: number }) {
@@ -2581,6 +2617,21 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
     if (map[key]) move(map[key]);
   });
 
+  useEffect(() => {
+    if (!tiles.some((tile) => tile.fresh || tile.merged)) return undefined;
+    const id = window.setTimeout(() => {
+      setTiles((current) => current.map(({ fresh, merged, ...tile }) => tile));
+    }, 210);
+    return () => window.clearTimeout(id);
+  }, [tiles]);
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) window.clearTimeout(animationRef.current);
+    };
+  }, []);
+
+  const board = boardFromTiles2048(tiles);
   const max = Math.max(...board.flat());
 
   return (
@@ -2607,7 +2658,8 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
         ]}
       />
       <div
-        className="game-board-panel mx-auto grid w-[min(98vw,40rem)] touch-none grid-cols-4 gap-2 rounded-lg p-2.5 sm:p-3"
+        className="game-board-panel relative mx-auto aspect-square w-[min(98vw,40rem)] touch-none overflow-hidden rounded-lg p-2.5 sm:p-3"
+        style={{ "--tile-gap": "0.5rem" } as React.CSSProperties}
         onPointerDown={(event) => {
           if (controlEnabled(controlMode, "gestures")) dragStart.current = { x: event.clientX, y: event.clientY };
         }}
@@ -2616,19 +2668,35 @@ function Game2048({ record, stats, sound }: GameComponentProps) {
           dragStart.current = null;
         }}
       >
-        {board.flatMap((row, y) =>
-          row.map((cell, x) => {
-            const asset = cell === 0 ? "tile-empty" : tileAssets2048.has(cell) ? `tile-${cell}` : null;
+        <div className="grid h-full w-full grid-cols-4 gap-2">
+          {range(16).map((index) => (
+            <div key={index} className="game-cell aspect-square overflow-hidden rounded-md border border-slate-300 bg-slate-100 shadow-inner dark:border-slate-700 dark:bg-slate-900">
+              <Sprite game="2048" name="tile-empty" className="h-full w-full opacity-70" />
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-2.5 sm:inset-3">
+          {tiles.map((tile) => {
+            const asset = tileAssets2048.has(tile.value) ? `tile-${tile.value}` : null;
+            const tileStyle = {
+              "--tile-x": tile.x,
+              "--tile-y": tile.y,
+            } as React.CSSProperties;
             return (
               <div
-                key={`${x}-${y}`}
-                className="game-cell aspect-square overflow-hidden rounded-md border border-slate-300 bg-slate-100 text-2xl font-black text-slate-950 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                key={tile.id}
+                className={cn(
+                  "tile-2048 game-cell absolute left-0 top-0 overflow-hidden rounded-md border border-slate-300 bg-slate-100 text-2xl font-black text-slate-950 shadow-sm dark:border-slate-700 dark:bg-slate-900",
+                  tile.fresh && "tile-2048-new",
+                  tile.merged && "tile-2048-merged",
+                )}
+                style={tileStyle}
               >
-                {asset ? <Sprite game="2048" name={asset} className="h-full w-full" /> : cell || ""}
+                {asset ? <Sprite game="2048" name={asset} className="h-full w-full" /> : tile.value}
               </div>
             );
-          }),
-        )}
+          })}
+        </div>
       </div>
       {controlEnabled(controlMode, "buttons") ? (
         <div className="mx-auto mt-4 grid max-w-xs grid-cols-3 gap-2">
